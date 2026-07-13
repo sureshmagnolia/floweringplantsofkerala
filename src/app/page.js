@@ -76,6 +76,7 @@ export default function Home() {
 
   const hasActiveFilter = useMemo(() => {
     if (search.textQuery.trim().length >= 3) return true;
+    if (search.family && search.family.trim().length > 0) return true;
     if (search.plantClass || search.leafType || search.flowerType || search.fruitType || search.habit || search.flowerColor || search.conservationStatus || search.habitat) return true;
     if (Object.values(search.flags).some(v => v === true)) return true;
     return false;
