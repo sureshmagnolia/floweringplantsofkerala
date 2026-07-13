@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import plantsData from '../data/plants.json';
 
 export default function Home() {
   const [password, setPassword] = useState('');
@@ -12,9 +11,7 @@ export default function Home() {
     const authTime = localStorage.getItem('keralaPlantsAuthTime');
     const authPass = localStorage.getItem('keralaPlantsPassword');
     const now = new Date().getTime();
-    // 24 hours = 24 * 60 * 60 * 1000 = 86400000 ms
     if (authTime && (now - parseInt(authTime) < 86400000) && authPass) {
-      // Auto login with stored password
       fetch('/api/authenticate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -29,14 +26,25 @@ export default function Home() {
       });
     }
   }, []);
+  
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [plants, setPlants] = useState([]);
   
   // Modal state
   const [selectedPlant, setSelectedPlant] = useState(null);
-  const [popupType, setPopupType] = useState(null); // 'citation', 'description', 'localities'
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [isZoomed, setIsZoomed] = useState(false);
+
+  const getImageUrl = (url) => {
+    if (!url) return '';
+    const idMatch = url.match(/id=([^&]+)/) || url.match(/d\/([a-zA-Z0-9-_]+)/);
+    if (idMatch) {
+      return `/api/image?id=${idMatch[1]}`;
+    }
+    return url;
+  };
 
   // Search state
   const defaultSearchState = {
@@ -50,16 +58,28 @@ export default function Home() {
     flowerColor: '',
     conservationStatus: '',
     habitat: '',
-    districts: '',
     flags: {
       garden: false, medicinal: false, edible: false, poisonous: false,
-      exotic: false, endemic: false, vegetables: false, epiphytes: false,
-      saprophytes: false, stemParasites: false, rootParasites: false, weeds: false
+      exotic: false, endemic: false
     }
   };
   const [search, setSearch] = useState(defaultSearchState);
 
   const resetFilters = () => setSearch(defaultSearchState);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search]);
+
+  const hasActiveFilter = useMemo(() => {
+    if (search.textQuery.trim().length >= 3) return true;
+    if (search.plantClass || search.leafType || search.flowerType || search.fruitType || search.habit || search.flowerColor || search.conservationStatus || search.habitat) return true;
+    if (Object.values(search.flags).some(v => v === true)) return true;
+    return false;
+  }, [search]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -100,50 +120,61 @@ export default function Home() {
   const HABITATS = ['Evergreen', 'Deciduous', 'Sacred groves', 'Plains', 'Coastal', 'Wetlands', 'Grasslands', 'Aquatic', 'Waste lands'];
   const CONSERVATION_STATUSES = ['CR', 'EN', 'VU', 'NT', 'DD', 'EX'];
 
-  const filteredPlants = plants.filter(p => {
-    if (search.textQuery && !p.scientificName?.toLowerCase().includes(search.textQuery.toLowerCase())) return false;
-    
-    if (search.plantClass && p.plantClass !== search.plantClass) return false;
-    if (search.leafType && p.leafType !== search.leafType) return false;
-    if (search.flowerType && p.flowerType !== search.flowerType) return false;
-    if (search.fruitType && p.fruitType !== search.fruitType) return false;
-    if (search.habit && p.habit !== search.habit) return false;
-    
-    // Dropdown filters
-    if (search.conservationStatus && p.conservationStatus !== search.conservationStatus) return false;
-    if (search.flowerColor && p.description && !p.description.toLowerCase().includes(search.flowerColor.toLowerCase())) return false;
-    if (search.habitat && p.habitat && !p.habitat.toLowerCase().includes(search.habitat.toLowerCase())) return false;
+  const filteredPlants = useMemo(() => {
+    return plants.filter(p => {
+      if (search.textQuery && !p.scientificName?.toLowerCase().includes(search.textQuery.toLowerCase())) return false;
+      
+      if (search.plantClass && p.plantClass !== search.plantClass) return false;
+      if (search.leafType && p.leafType !== search.leafType) return false;
+      if (search.flowerType && p.flowerType !== search.flowerType) return false;
+      if (search.fruitType && p.fruitType !== search.fruitType) return false;
+      if (search.habit && p.habit !== search.habit) return false;
+      
+      if (search.conservationStatus && p.conservationStatus !== search.conservationStatus) return false;
+      if (search.flowerColor && p.description && !p.description.toLowerCase().includes(search.flowerColor.toLowerCase())) return false;
+      if (search.habitat && p.habitat && !p.habitat.toLowerCase().includes(search.habitat.toLowerCase())) return false;
+  
+      if (search.flags.garden && !p.flags.garden) return false;
+      if (search.flags.medicinal && !p.flags.medicinal) return false;
+      if (search.flags.edible && !p.flags.edible) return false;
+      if (search.flags.poisonous && !p.flags.poisonous) return false;
+      if (search.flags.exotic && !p.flags.exotic) return false;
+      if (search.flags.endemic && !p.flags.endemic) return false;
+      return true;
+    });
+  }, [plants, search]);
 
-    // Checkbox flags
-    if (search.flags.garden && !p.flags.garden) return false;
-    if (search.flags.medicinal && !p.flags.medicinal) return false;
-    if (search.flags.edible && !p.flags.edible) return false;
-    if (search.flags.poisonous && !p.flags.poisonous) return false;
-    if (search.flags.exotic && !p.flags.exotic) return false;
-    if (search.flags.endemic && !p.flags.endemic) return false;
-    return true;
-  });
+  const paginatedPlants = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredPlants.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredPlants, currentPage]);
+
+  const totalPages = Math.ceil(filteredPlants.length / itemsPerPage);
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-green-50">
-        <form onSubmit={handleLogin} className="bg-white p-8 rounded-lg shadow-md max-w-sm w-full">
-          <h2 className="text-2xl font-bold mb-6 text-green-800">Kerala Plants Database</h2>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2">Password</label>
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+        <form onSubmit={handleLogin} className="bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 max-w-sm w-full">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Kerala Plants</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">Sign in to access the database</p>
+          </div>
+          <div className="mb-6">
+            <label className="block text-slate-700 dark:text-slate-300 text-sm font-semibold mb-2">Password</label>
             <input 
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md text-gray-900 bg-white"
+              className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               required
+              placeholder="Enter password..."
             />
           </div>
-          {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+          {error && <p className="text-red-500 text-sm mb-4 text-center font-medium">{error}</p>}
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-green-600 text-white font-bold py-2 px-4 rounded hover:bg-green-700"
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors shadow-sm disabled:opacity-50"
           >
             {loading ? 'Verifying...' : 'Access Database'}
           </button>
@@ -152,286 +183,436 @@ export default function Home() {
     );
   }
 
+  const inputClass = "w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 dark:text-slate-100 shadow-sm transition-all appearance-none";
+  const labelClass = "block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5";
+
   return (
-    <div className="min-h-screen bg-purple-200 p-8 relative">
-      <div className="max-w-6xl mx-auto bg-purple-300 rounded-lg shadow-xl overflow-hidden border-2 border-purple-400">
-        <div className="p-4 bg-purple-400 text-white font-bold text-lg flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span>🌸</span> Advanced Search
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-emerald-200">
+      {/* Header */}
+      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <h1 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white tracking-tight">
+            <span className="text-2xl">🌿</span> Kerala Plants
+          </h1>
+          <div className="text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 px-3 py-1 rounded-full uppercase tracking-wider">
+            {filteredPlants.length} Species
           </div>
-          <button 
-            onClick={resetFilters} 
-            className="bg-red-500 hover:bg-red-600 text-sm px-4 py-1 rounded shadow text-white transition-colors border border-red-700"
-          >
-            Reset Filters
-          </button>
         </div>
-        
-        <div className="flex flex-col md:flex-row p-6 gap-6">
+      </header>
+
+      {/* Main Layout */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           
-          {/* Left Column (Radio Buttons) */}
-          <div className="w-full md:w-1/3 flex flex-col gap-4">
-            <div className="bg-purple-200 p-3 rounded border border-purple-400">
-              <label className="font-semibold text-purple-900 block mb-2">Monocots/Dicots/Gymnosperms</label>
-              <div className="flex gap-4 text-sm text-purple-900">
-                <label><input type="radio" name="class" checked={search.plantClass === 'Monocots'} onChange={() => setSearch({...search, plantClass: 'Monocots'})} /> Monocots</label>
-                <label><input type="radio" name="class" checked={search.plantClass === 'Dicots'} onChange={() => setSearch({...search, plantClass: 'Dicots'})} /> Dicots</label>
-                <label><input type="radio" name="class" checked={search.plantClass === 'Gymnosperms'} onChange={() => setSearch({...search, plantClass: 'Gymnosperms'})} /> Gymnosperms</label>
-              </div>
-            </div>
-            <div className="bg-purple-200 p-3 rounded border border-purple-400">
-              <label className="font-semibold text-purple-900 block mb-2">Leaf type</label>
-              <div className="flex gap-4 text-sm text-purple-900">
-                <label><input type="radio" name="leaf" checked={search.leafType === 'Simple'} onChange={() => setSearch({...search, leafType: 'Simple'})} /> Simple</label>
-                <label><input type="radio" name="leaf" checked={search.leafType === 'Compound'} onChange={() => setSearch({...search, leafType: 'Compound'})} /> Compound</label>
-                <label><input type="radio" name="leaf" checked={search.leafType === 'Leafless'} onChange={() => setSearch({...search, leafType: 'Leafless'})} /> Leafless</label>
-              </div>
-            </div>
-            <div className="bg-purple-200 p-3 rounded border border-purple-400">
-              <label className="font-semibold text-purple-900 block mb-2">Flowers</label>
-              <div className="flex gap-4 text-sm text-purple-900">
-                <label><input type="radio" name="flower" checked={search.flowerType === 'Single'} onChange={() => setSearch({...search, flowerType: 'Single'})} /> Single</label>
-                <label><input type="radio" name="flower" checked={search.flowerType === 'Group'} onChange={() => setSearch({...search, flowerType: 'Group'})} /> Group</label>
-              </div>
-            </div>
-            <div className="bg-purple-200 p-3 rounded border border-purple-400">
-              <label className="font-semibold text-purple-900 block mb-2">Fruit</label>
-              <div className="flex gap-4 text-sm text-purple-900">
-                <label><input type="radio" name="fruit" checked={search.fruitType === 'Fleshy'} onChange={() => setSearch({...search, fruitType: 'Fleshy'})} /> Fleshy</label>
-                <label><input type="radio" name="fruit" checked={search.fruitType === 'Dry'} onChange={() => setSearch({...search, fruitType: 'Dry'})} /> Dry</label>
-              </div>
-            </div>
-            <div className="bg-purple-200 p-3 rounded border border-purple-400">
-              <label className="font-semibold text-purple-900 block mb-2">Habit</label>
-              <div className="grid grid-cols-2 gap-2 text-sm text-purple-900">
-                <label><input type="radio" name="habit" checked={search.habit === 'Climbers'} onChange={() => setSearch({...search, habit: 'Climbers'})} /> Climbers</label>
-                <label><input type="radio" name="habit" checked={search.habit === 'Shrubs'} onChange={() => setSearch({...search, habit: 'Shrubs'})} /> Shrubs</label>
-                <label><input type="radio" name="habit" checked={search.habit === 'Herbs'} onChange={() => setSearch({...search, habit: 'Herbs'})} /> Herbs</label>
-                <label><input type="radio" name="habit" checked={search.habit === 'Trees'} onChange={() => setSearch({...search, habit: 'Trees'})} /> Trees</label>
-              </div>
-            </div>
-          </div>
-          
-          {/* Middle Column */}
-          <div className="w-full md:w-1/3 flex flex-col gap-4">
-            <div>
-              <label className="text-purple-900 font-semibold mb-1 block">Flower Colour</label>
-              <select 
-                className="w-full p-1 rounded border border-purple-400 text-gray-900 bg-white"
-                value={search.flowerColor}
-                onChange={(e) => setSearch({...search, flowerColor: e.target.value})}
-              >
-                <option value="">Any</option>
-                {FLOWER_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-purple-900 font-semibold mb-1 block">Conservation Status</label>
-              <select 
-                className="w-full p-1 rounded border border-purple-400 text-gray-900 bg-white"
-                value={search.conservationStatus}
-                onChange={(e) => setSearch({...search, conservationStatus: e.target.value})}
-              >
-                <option value="">Any</option>
-                {CONSERVATION_STATUSES.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-purple-900 font-semibold mb-1 block">Habitat</label>
-              <select 
-                className="w-full p-1 rounded border border-purple-400 text-gray-900 bg-white"
-                value={search.habitat}
-                onChange={(e) => setSearch({...search, habitat: e.target.value})}
-              >
-                <option value="">Any</option>
-                {HABITATS.map(h => <option key={h} value={h}>{h}</option>)}
-              </select>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-y-4 gap-x-2 mt-4 text-sm text-purple-900 font-medium">
-              <label><input type="checkbox" checked={search.flags.garden} onChange={() => handleFlagChange('garden')} className="mr-2"/> Garden Plants</label>
-              <label><input type="checkbox" checked={search.flags.medicinal} onChange={() => handleFlagChange('medicinal')} className="mr-2"/> Medicinal Plants</label>
-              <label><input type="checkbox" checked={search.flags.edible} onChange={() => handleFlagChange('edible')} className="mr-2"/> Edible Fruits</label>
-              <label><input type="checkbox" checked={search.flags.poisonous} onChange={() => handleFlagChange('poisonous')} className="mr-2"/> Poisonous Plants</label>
-              <label><input type="checkbox" checked={search.flags.exotic} onChange={() => handleFlagChange('exotic')} className="mr-2"/> Exotic Plants</label>
-              <label><input type="checkbox" checked={search.flags.endemic} onChange={() => handleFlagChange('endemic')} className="mr-2"/> Endemic Plants</label>
-            </div>
-          </div>
-          
-          {/* Right Column (Results) */}
-          <div className="w-full md:w-1/3 bg-white rounded-md flex flex-col border border-purple-400">
-            <div className="p-3 bg-purple-100 border-b border-purple-200">
-              <input 
-                type="text" 
-                placeholder="Search species name..." 
-                value={search.textQuery}
-                onChange={(e) => setSearch({...search, textQuery: e.target.value})}
-                className="w-full px-2 py-1 rounded border border-purple-300 text-gray-900 text-sm focus:outline-none focus:border-purple-500"
-              />
-            </div>
-            <div className="p-2 bg-purple-200 text-purple-900 font-bold text-center border-b border-purple-300 text-sm">
-              SPECIES LIST ({filteredPlants.length}/{plants.length})
-            </div>
-            <div className="flex-1 overflow-y-auto max-h-[440px]">
-              {filteredPlants.map((plant, i) => (
-                <div 
-                  key={i} 
-                  onClick={() => {
-                    setSelectedPlant(plant);
-                    setCurrentImageIndex(0);
-                    setPopupType(null);
-                  }}
-                  className="text-gray-900 text-sm hover:bg-blue-600 hover:text-white cursor-pointer px-3 py-1 border-b border-gray-100 transition-colors"
+          {/* Sidebar / Filters */}
+          <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-4">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-bold text-slate-800 dark:text-slate-200">Filters</h2>
+                <button 
+                  onClick={resetFilters} 
+                  className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors"
                 >
-                  {plant.scientificName || "Unnamed Plant"}
+                  Reset All
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Search */}
+                <div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+                    <input 
+                      type="text" 
+                      placeholder="Search scientific name..." 
+                      value={search.textQuery}
+                      onChange={(e) => setSearch({...search, textQuery: e.target.value})}
+                      className={`pl-9 ${inputClass}`}
+                    />
+                  </div>
                 </div>
-              ))}
-              {filteredPlants.length === 0 && (
-                <div className="text-gray-400 text-center italic mt-4 text-sm">No species match the selected filters.</div>
+
+                <div>
+                  <label className={labelClass}>Family</label>
+                  <input 
+                    type="text" 
+                    value={search.family || ''} 
+                    onChange={(e) => setSearch({...search, family: e.target.value})}
+                    placeholder="Search family..."
+                    className={inputClass}
+                  />
+                </div>
+                
+                <div>
+                  <label className={labelClass}>Class</label>
+                  <select className={inputClass} value={search.plantClass} onChange={(e) => setSearch({...search, plantClass: e.target.value})}>
+                    <option value="">Any</option><option value="Monocots">Monocots</option><option value="Dicots">Dicots</option><option value="Gymnosperms">Gymnosperms</option>
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass}>Leaf</label>
+                    <select className={inputClass} value={search.leafType} onChange={(e) => setSearch({...search, leafType: e.target.value})}>
+                      <option value="">Any</option><option value="Simple">Simple</option><option value="Compound">Compound</option><option value="Leafless">Leafless</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Flower</label>
+                    <select className={inputClass} value={search.flowerType} onChange={(e) => setSearch({...search, flowerType: e.target.value})}>
+                      <option value="">Any</option><option value="Single">Single</option><option value="Group">Group</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClass}>Fruit</label>
+                    <select className={inputClass} value={search.fruitType} onChange={(e) => setSearch({...search, fruitType: e.target.value})}>
+                      <option value="">Any</option><option value="Fleshy">Fleshy</option><option value="Dry">Dry</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Habit</label>
+                    <select className={inputClass} value={search.habit} onChange={(e) => setSearch({...search, habit: e.target.value})}>
+                      <option value="">Any</option><option value="Tree">Tree</option><option value="Shrub">Shrub</option><option value="Herb">Herb</option><option value="Climber">Climber</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Color</label>
+                  <select className={inputClass} value={search.flowerColor} onChange={(e) => setSearch({...search, flowerColor: e.target.value})}>
+                    <option value="">Any</option>
+                    {FLOWER_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Habitat</label>
+                  <select className={inputClass} value={search.habitat} onChange={(e) => setSearch({...search, habitat: e.target.value})}>
+                    <option value="">Any</option>
+                    {HABITATS.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelClass}>Conservation</label>
+                  <select className={inputClass} value={search.conservationStatus} onChange={(e) => setSearch({...search, conservationStatus: e.target.value})}>
+                    <option value="">Any</option>
+                    {CONSERVATION_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                {/* Flags/Properties */}
+                <div className="pt-2">
+                  <label className={labelClass}>Properties</label>
+                  <div className="flex flex-col gap-2 mt-2">
+                    {[
+                      { key: 'endemic', label: 'Endemic', color: 'blue' },
+                      { key: 'medicinal', label: 'Medicinal', color: 'emerald' },
+                      { key: 'poisonous', label: 'Poisonous', color: 'red' },
+                      { key: 'edible', label: 'Edible', color: 'orange' },
+                      { key: 'garden', label: 'Garden', color: 'purple' },
+                      { key: 'exotic', label: 'Exotic', color: 'indigo' },
+                    ].map((config) => (
+                      <label key={config.key} className="flex items-center gap-3 cursor-pointer group">
+                        <div className="relative flex items-center">
+                          <input 
+                            type="checkbox" 
+                            checked={search.flags[config.key]}
+                            onChange={(e) => setSearch({
+                              ...search,
+                              flags: {...search.flags, [config.key]: e.target.checked}
+                            })}
+                            className="peer sr-only"
+                          />
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${search.flags[config.key] ? `bg-${config.color}-500 border-${config.color}-500` : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
+                            {search.flags[config.key] && <span className="text-white text-[10px]">✓</span>}
+                          </div>
+                        </div>
+                        <span className={`text-sm font-medium ${search.flags[config.key] ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>{config.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* Main List */}
+          <div className="flex-1 flex flex-col h-[800px] lg:h-[calc(100vh-6rem)]">
+            
+            {/* List Body */}
+            <div className="flex-1 overflow-y-auto pb-4">
+              {hasActiveFilter ? (
+                filteredPlants.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {paginatedPlants.map((plant, i) => (
+                      <div 
+                        key={i} 
+                        onClick={() => {
+                          setSelectedPlant(plant);
+                          setCurrentImageIndex(0);
+                        }}
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col group"
+                      >
+                        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                          {plant.scientificName}
+                        </h3>
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3 truncate">
+                          {plant.family}
+                        </p>
+                        
+                        <div className="mt-auto flex flex-wrap gap-1.5">
+                          <span className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">
+                            {plant.habit || 'Unknown Habit'}
+                          </span>
+                          {plant.conservationStatus && (
+                            <span className="text-[10px] font-semibold bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 py-0.5 rounded">
+                              {plant.conservationStatus}
+                            </span>
+                          )}
+                          {plant.flags.endemic && (
+                            <span className="text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded">Endemic</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                    <div className="w-16 h-16 mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-2xl">
+                      🔍
+                    </div>
+                    <p className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-1">No plants found</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Try adjusting your filters or search term.</p>
+                  </div>
+                )
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center p-8">
+                  <div className="w-16 h-16 mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-2xl">
+                    🌱
+                  </div>
+                  <p className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-1">Ready to explore</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto">Enter at least 3 characters or select a filter to view plants.</p>
+                </div>
               )}
             </div>
+
+            {/* Pagination Controls */}
+            {hasActiveFilter && filteredPlants.length > 0 && (
+              <div className="py-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 mt-auto">
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                  Showing <span className="text-slate-900 dark:text-white font-bold">{Math.min(filteredPlants.length, (currentPage - 1) * itemsPerPage + 1)}</span> to <span className="text-slate-900 dark:text-white font-bold">{Math.min(filteredPlants.length, currentPage * itemsPerPage)}</span> of <span className="text-slate-900 dark:text-white font-bold">{filteredPlants.length}</span>
+                </span>
+                
+                <div className="flex gap-2">
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+
           </div>
-
         </div>
-      </div>
+      </main>
 
-      {/* PLANT DETAILS MODAL */}
+      {/* Plant Details Modal */}
       {selectedPlant && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-purple-200 rounded-lg shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col border-2 border-purple-400">
-            
-            {/* Header */}
-            <div className="bg-red-400 text-white font-bold px-4 py-2 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span>🌺</span> Details of Plants
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm">
+          <div 
+            className="bg-white dark:bg-slate-900 w-full max-w-3xl max-h-[90vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 sm:px-6 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate pr-4">
+                  {selectedPlant.scientificName}
+                </h2>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                  {selectedPlant.family}
+                </p>
               </div>
               <button 
                 onClick={() => setSelectedPlant(null)}
-                className="bg-red-600 hover:bg-red-700 px-3 rounded text-sm font-bold shadow"
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors flex-shrink-0"
               >
-                X
+                ✕
               </button>
             </div>
 
-            <div className="p-6">
-              <h2 className="text-2xl font-bold text-center text-purple-900 bg-white p-2 mb-6 rounded shadow-sm">
-                {selectedPlant.scientificName}
-              </h2>
-
-              <div className="flex flex-col md:flex-row gap-6">
-                
-                {/* Left Side: Details Fields */}
-                <div className="flex-1 flex flex-col gap-4">
-                  <div className="flex items-center">
-                    <span className="w-32 font-semibold text-purple-900 text-sm">Family</span>
-                    <div className="flex-1 bg-white p-2 rounded text-gray-900 text-sm shadow-inner">{selectedPlant.family || 'N/A'}</div>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="w-32 font-semibold text-purple-900 text-sm">Habit</span>
-                    <div className="flex-1 bg-white p-2 rounded text-gray-900 text-sm shadow-inner">{selectedPlant.habit || 'N/A'}</div>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="w-32 font-semibold text-purple-900 text-sm">Status</span>
-                    <div className="flex-1 bg-white p-2 rounded text-gray-900 text-sm shadow-inner">{selectedPlant.conservationStatus || 'N/A'}</div>
-                  </div>
-                  <div className="flex items-center">
-                    <span className="w-32 font-semibold text-purple-900 text-sm">Endemic</span>
-                    <div className="flex-1 bg-white p-2 rounded text-gray-900 text-sm shadow-inner">{selectedPlant.flags?.endemic ? 'Yes' : 'No'}</div>
-                  </div>
-                  <div className="flex items-start">
-                    <span className="w-32 font-semibold text-purple-900 text-sm mt-2">Flowering &<br/>Fruiting</span>
-                    <div className="flex-1 bg-white p-2 rounded text-gray-900 text-sm shadow-inner min-h-[2.5rem]">{selectedPlant.phenology || 'N/A'}</div>
-                  </div>
-                  <div className="flex items-start">
-                    <span className="w-32 font-semibold text-purple-900 text-sm mt-2">Habitat</span>
-                    <div className="flex-1 bg-white p-2 rounded text-gray-900 text-sm shadow-inner min-h-[4rem]">{selectedPlant.habitat || 'N/A'}</div>
-                  </div>
-                  <div className="flex items-start">
-                    <span className="w-32 font-semibold text-purple-900 text-sm mt-2">Distribution</span>
-                    <div className="flex-1 bg-white p-2 rounded text-gray-900 text-sm shadow-inner min-h-[4rem]">{selectedPlant.distribution || 'N/A'}</div>
-                  </div>
-
-                  {/* Buttons */}
-                  <div className="flex gap-2 justify-center mt-auto pt-4 border-t border-purple-300">
-                    <button onClick={() => setPopupType('Citation')} className="px-4 py-2 rounded font-semibold text-sm transition-colors bg-purple-100 text-purple-900 hover:bg-purple-300">Citation</button>
-                    <button onClick={() => setPopupType('Description')} className="px-4 py-2 rounded font-semibold text-sm transition-colors bg-purple-100 text-purple-900 hover:bg-purple-300">Description</button>
-                    <button onClick={() => setPopupType('Localities')} className="px-4 py-2 rounded font-semibold text-sm transition-colors bg-purple-100 text-purple-900 hover:bg-purple-300">Localities</button>
-                    <button onClick={() => setSelectedPlant(null)} className="px-6 py-2 rounded font-bold text-sm bg-purple-100 text-purple-900 hover:bg-red-200 ml-4 border border-purple-300">CLOSE</button>
-                  </div>
+            {/* Modal Body */}
+            <div className="overflow-y-auto flex-1 p-4 sm:p-6">
+              
+              {/* Image Gallery */}
+              {selectedPlant.images && selectedPlant.images.length > 0 && (
+                <div className="mb-6 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 relative group aspect-video flex items-center justify-center">
+                  <img 
+                    src={getImageUrl(selectedPlant.images[currentImageIndex])} 
+                    alt={selectedPlant.scientificName} 
+                    className="max-w-full max-h-full object-contain cursor-zoom-in transition-transform duration-300"
+                    referrerPolicy="no-referrer"
+                    onClick={() => setFullscreenImage(getImageUrl(selectedPlant.images[currentImageIndex]))}
+                  />
                   
-                  {/* Thumbnails */}
-                  <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
-                    {selectedPlant.images && selectedPlant.images.length > 0 ? (
-                      selectedPlant.images.map((url, i) => (
-                        <button 
-                          key={i}
-                          onClick={() => setCurrentImageIndex(i)}
-                          className={`flex-shrink-0 w-16 h-12 rounded border-2 overflow-hidden relative ${currentImageIndex === i ? 'border-red-500 shadow-[0_0_8px_rgba(239,68,68,1)]' : 'border-white hover:border-purple-400'}`}
-                        >
-                          <img src={url.replace('https://drive.google.com/uc?id=', '/api/image?id=')} alt={`Thumbnail ${i}`} className="object-cover w-full h-full" referrerPolicy="no-referrer" />
-                        </button>
-                      ))
-                    ) : (
-                      <div className="w-full text-xs text-purple-700 italic">No images available for this species.</div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Right Side: Big Image */}
-                <div className="flex-1 border-2 border-purple-900 rounded bg-black flex items-center justify-center min-h-[400px] relative overflow-hidden">
-                  {selectedPlant.images && selectedPlant.images.length > 0 ? (
-                    <img 
-                      src={selectedPlant.images[currentImageIndex].replace('https://drive.google.com/uc?id=', '/api/image?id=')} 
-                      alt={selectedPlant.scientificName} 
-                      className="object-contain w-full h-full" 
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <p className="text-gray-400 italic">Image missing.</p>
+                  {/* Gallery Controls */}
+                  {selectedPlant.images.length > 1 && (
+                    <>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentImageIndex(prev => prev === 0 ? selectedPlant.images.length - 1 : prev - 1);
+                        }}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 backdrop-blur-md"
+                      >
+                        ←
+                      </button>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentImageIndex(prev => prev === selectedPlant.images.length - 1 ? 0 : prev + 1);
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70 backdrop-blur-md"
+                      >
+                        →
+                      </button>
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 bg-black/30 backdrop-blur-md px-2 py-1 rounded-full">
+                        {selectedPlant.images.map((_, idx) => (
+                          <div 
+                            key={idx} 
+                            className={`w-1.5 h-1.5 rounded-full transition-all ${idx === currentImageIndex ? 'bg-white scale-125' : 'bg-white/50'}`}
+                          />
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
-                
+              )}
+
+              {/* Data Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { label: "Family", value: selectedPlant.family },
+                  { label: "Vernacular Name", value: selectedPlant.vernacularName },
+                  { label: "Habit", value: selectedPlant.habit },
+                  { label: "Class", value: selectedPlant.plantClass },
+                  { label: "Leaf Type", value: selectedPlant.leafType },
+                  { label: "Flower Type", value: selectedPlant.flowerType },
+                  { label: "Fruit Type", value: selectedPlant.fruitType },
+                  { label: "Habitat", value: selectedPlant.habitat },
+                  { label: "Flowering & Fruiting", value: selectedPlant.phenology },
+                  { label: "Distribution", value: selectedPlant.distribution },
+                  { label: "Localities", value: selectedPlant.districts },
+                  { label: "Status", value: selectedPlant.conservationStatus }
+                ].map((item, idx) => item.value && (
+                  <div key={idx} className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                    <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">{item.label}</span>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.value}</span>
+                  </div>
+                ))}
               </div>
+
+              {/* Properties / Flags */}
+              <div className="mt-4 flex flex-wrap gap-2">
+                {[
+                  { key: 'endemic', label: 'Endemic', color: 'blue' },
+                  { key: 'medicinal', label: 'Medicinal', color: 'emerald' },
+                  { key: 'poisonous', label: 'Poisonous', color: 'red' },
+                  { key: 'edible', label: 'Edible', color: 'orange' },
+                  { key: 'garden', label: 'Garden', color: 'purple' },
+                  { key: 'exotic', label: 'Exotic', color: 'indigo' },
+                ].filter(flag => selectedPlant.flags?.[flag.key]).map((flag) => (
+                  <span 
+                    key={flag.key} 
+                    className={`text-xs font-bold px-2.5 py-1 rounded-md border bg-${flag.color}-50 dark:bg-${flag.color}-900/20 text-${flag.color}-700 dark:text-${flag.color}-400 border-${flag.color}-200 dark:border-${flag.color}-800/50`}
+                  >
+                    {flag.label}
+                  </span>
+                ))}
+              </div>
+
+              {/* Citation */}
+              {selectedPlant.citation && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2">Citation</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/30 italic">
+                    {selectedPlant.citation}
+                  </p>
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedPlant.description && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2">Description</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                    {selectedPlant.description}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-          
-          {/* LEGACY POPUPS */}
-          {popupType && (
-            <div className="fixed inset-0 flex items-center justify-center z-[60] pointer-events-none">
-              <div className="bg-[#EAE4FF] border border-blue-400 rounded-sm shadow-xl w-full max-w-3xl flex flex-col pointer-events-auto" style={{ boxShadow: '2px 2px 10px rgba(0,0,0,0.5)' }}>
-                
-                {/* Legacy Window Title Bar */}
-                <div className="bg-[#E47B89] text-white text-xs font-bold px-2 py-1 flex justify-between items-center border-b border-white">
-                  <div className="flex items-center gap-1 uppercase">
-                    <span>🌸</span> {popupType}
-                  </div>
-                  <button onClick={() => setPopupType(null)} className="bg-[#D35A6A] hover:bg-red-700 px-2 rounded-sm border border-white text-xs">X</button>
-                </div>
-                
-                {/* Content Area */}
-                <div className="p-2">
-                  <div className="bg-white p-4 border border-gray-300 overflow-y-auto h-[400px] text-sm text-gray-900 whitespace-pre-wrap">
-                    {popupType === 'Citation' && (selectedPlant.citation || 'No citation available.')}
-                    {popupType === 'Description' && (selectedPlant.description || 'No description available.')}
-                    {popupType === 'Localities' && (
-                       <div className="flex flex-col h-full items-center justify-center">
-                         <p className="font-bold mb-4 text-blue-800 text-lg">DISTRIBUTION MAP</p>
-                         <p className="italic text-center mb-4 px-4">{selectedPlant.districts || 'No locality data available.'}</p>
-                         <div className="w-3/4 flex-1 border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 p-4 text-center">
-                           Since a static map image of Kerala is not included in the web app yet, the districts are listed above. If you have the "kerala_map.jpg", we can overlay these districts on it!
-                         </div>
-                       </div>
-                    )}
-                  </div>
-                </div>
+        </div>
+      )}
 
-                {/* Footer Close Button */}
-                <div className="flex justify-center p-2 bg-[#D1CAFF] border-t border-white">
-                  <button onClick={() => setPopupType(null)} className="px-6 py-1 bg-[#EAE4FF] border border-gray-400 rounded-sm text-blue-900 text-sm hover:bg-white transition-colors">Close</button>
-                </div>
-              </div>
+      {/* Fullscreen Image Overlay */}
+      {fullscreenImage && (
+        <div 
+          className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-8"
+          onClick={() => {
+            setFullscreenImage(null);
+            setIsZoomed(false);
+          }}
+        >
+          <button 
+            className="absolute top-4 right-4 sm:top-8 sm:right-8 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors z-[70]"
+            onClick={(e) => {
+              e.stopPropagation();
+              setFullscreenImage(null);
+              setIsZoomed(false);
+            }}
+          >
+            ✕
+          </button>
+
+          <div 
+            className={`relative transition-all duration-300 ease-in-out cursor-pointer ${isZoomed ? 'w-full h-full' : 'max-w-full max-h-full'}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsZoomed(!isZoomed);
+            }}
+            style={{
+              width: isZoomed ? '100vw' : 'auto',
+              height: isZoomed ? '100vh' : 'auto',
+            }}
+          >
+            <div className={`w-full h-full ${isZoomed ? 'overflow-auto flex items-center justify-center' : 'flex items-center justify-center'}`}>
+              <img 
+                src={fullscreenImage} 
+                alt="Fullscreen view" 
+                className={`transition-all duration-300 ${isZoomed ? 'max-w-none scale-150 cursor-zoom-out' : 'max-w-full max-h-[100vh] object-contain cursor-zoom-in'}`}
+                referrerPolicy="no-referrer"
+                style={{
+                  maxWidth: isZoomed ? '200vw' : '100%',
+                  maxHeight: isZoomed ? '200vh' : '100%',
+                }}
+              />
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
