@@ -297,28 +297,28 @@ export default function Home() {
 
       {/* PLANT DETAILS MODAL */}
       {selectedPlant && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-purple-200 rounded-lg shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col border-2 border-purple-400">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-2 sm:p-4">
+          <div className="bg-purple-200 rounded-lg shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col border-2 border-purple-400">
             
             {/* Header */}
-            <div className="bg-red-400 text-white font-bold px-4 py-2 flex justify-between items-center">
+            <div className="bg-red-400 text-white font-bold px-4 py-2 flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2">
                 <span>🌺</span> Details of Plants
               </div>
               <button 
                 onClick={() => setSelectedPlant(null)}
-                className="bg-red-600 hover:bg-red-700 px-3 rounded text-sm font-bold shadow"
+                className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-sm font-bold shadow"
               >
                 X
               </button>
             </div>
 
-            <div className="p-6">
-              <h2 className="text-2xl font-bold text-center text-purple-900 bg-white p-2 mb-6 rounded shadow-sm">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-center text-purple-900 bg-white p-2 mb-4 sm:mb-6 rounded shadow-sm">
                 {selectedPlant.scientificName}
               </h2>
 
-              <div className="flex flex-col md:flex-row gap-6">
+              <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
                 
                 {/* Left Side: Details Fields */}
                 <div className="flex-1 flex flex-col gap-4">
@@ -352,15 +352,15 @@ export default function Home() {
                   </div>
 
                   {/* Buttons */}
-                  <div className="flex gap-2 justify-center mt-auto pt-4 border-t border-purple-300">
+                  <div className="flex flex-wrap gap-2 justify-center mt-auto pt-4 border-t border-purple-300">
                     <button onClick={() => setPopupType('Citation')} className="px-4 py-2 rounded font-semibold text-sm transition-colors bg-purple-100 text-purple-900 hover:bg-purple-300">Citation</button>
                     <button onClick={() => setPopupType('Description')} className="px-4 py-2 rounded font-semibold text-sm transition-colors bg-purple-100 text-purple-900 hover:bg-purple-300">Description</button>
                     <button onClick={() => setPopupType('Localities')} className="px-4 py-2 rounded font-semibold text-sm transition-colors bg-purple-100 text-purple-900 hover:bg-purple-300">Localities</button>
-                    <button onClick={() => setSelectedPlant(null)} className="px-6 py-2 rounded font-bold text-sm bg-purple-100 text-purple-900 hover:bg-red-200 ml-4 border border-purple-300">CLOSE</button>
+                    <button onClick={() => setSelectedPlant(null)} className="px-6 py-2 rounded font-bold text-sm bg-purple-100 text-purple-900 hover:bg-red-200 sm:ml-4 border border-purple-300">CLOSE</button>
                   </div>
                   
                   {/* Thumbnails */}
-                  <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                  <div className="flex gap-2 mt-4 overflow-x-auto pb-2 w-full">
                     {selectedPlant.images && selectedPlant.images.length > 0 ? (
                       selectedPlant.images.map((url, i) => (
                         <button 
@@ -378,7 +378,7 @@ export default function Home() {
                 </div>
 
                 {/* Right Side: Big Image */}
-                <div className="flex-1 border-2 border-purple-900 rounded bg-black flex items-center justify-center min-h-[400px] relative overflow-hidden">
+                <div className="flex-1 w-full border-2 border-purple-900 rounded bg-black flex items-center justify-center min-h-[250px] max-h-[300px] lg:min-h-[400px] lg:max-h-[500px] relative overflow-hidden">
                   {selectedPlant.images && selectedPlant.images.length > 0 ? (
                     <img 
                       src={selectedPlant.images[currentImageIndex].replace('https://drive.google.com/uc?id=', '/api/image?id=')} 
