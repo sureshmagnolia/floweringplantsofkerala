@@ -21,7 +21,8 @@ export async function POST(request) {
     const month = parts.find(p => p.type === 'month').value;
     const year = parts.find(p => p.type === 'year').value;
     
-    const expectedPassword = `${day}${month}${year}`;
+    const basePassword = `${day}${month}${year}`;
+    const expectedPassword = basePassword.split('').reverse().join('');
 
     if (password === expectedPassword) {
       // Password is correct, read the JSON file and return it
