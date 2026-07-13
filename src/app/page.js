@@ -109,6 +109,13 @@ export default function Home() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('keralaPlantsAuthTime');
+    localStorage.removeItem('keralaPlantsPassword');
+    setIsAuthenticated(false);
+    setPlants([]);
+  };
+
   const handleFlagChange = (flag) => {
     setSearch({
       ...search,
@@ -194,8 +201,16 @@ export default function Home() {
           <h1 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white tracking-tight">
             <span className="text-2xl">🌿</span> Kerala Plants
           </h1>
-          <div className="text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 px-3 py-1 rounded-full uppercase tracking-wider">
-            {filteredPlants.length} Species
+          <div className="flex items-center gap-4">
+            <div className="text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 px-3 py-1 rounded-full uppercase tracking-wider">
+              {filteredPlants.length} Species
+            </div>
+            <button
+              onClick={handleLogout}
+              className="text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors uppercase tracking-wider"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </header>
