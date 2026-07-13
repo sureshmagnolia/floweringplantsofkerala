@@ -125,7 +125,7 @@ export default function Home() {
 
   const filteredPlants = plants.filter(p => {
     if (search.textQuery && !p.scientificName?.toLowerCase().includes(search.textQuery.toLowerCase())) return false;
-    if (search.family && p.family && !p.family.toLowerCase().includes(search.family.toLowerCase())) return false;
+    if (search.family && (!p.family || !p.family.toLowerCase().includes(search.family.toLowerCase()))) return false;
     
     if (search.plantClass && p.plantClass !== search.plantClass) return false;
     if (search.leafType && p.leafType !== search.leafType) return false;
