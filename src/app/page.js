@@ -41,6 +41,7 @@ export default function Home() {
   // Search state
   const defaultSearchState = {
     textQuery: '',
+    family: '',
     nameType: '', 
     plantClass: '', 
     leafType: '', 
@@ -107,8 +108,24 @@ export default function Home() {
   const HABITATS = ['Evergreen', 'Deciduous', 'Sacred groves', 'Plains', 'Coastal', 'Wetlands', 'Grasslands', 'Aquatic', 'Waste lands'];
   const CONSERVATION_STATUSES = ['CR', 'EN', 'VU', 'NT', 'DD', 'EX'];
 
+  const [familyDropdownOpen, setFamilyDropdownOpen] = useState(false);
+
+  const uniqueFamilies = useMemo(() => {
+    const families = new Set(plants.map(p => p.family).filter(Boolean));
+    return Array.from(families).sort();
+  }, [plants]);
+
+  const matchingFamilies = useMemo(() => {
+    if (!search.family || search.family.length < 3) return [];
+    const lowerQuery = search.family.toLowerCase();
+    const matches = uniqueFamilies.filter(f => f.toLowerCase().includes(lowerQuery));
+    if (matches.length === 1 && matches[0].toLowerCase() === lowerQuery) return [];
+    return matches;
+  }, [search.family, uniqueFamilies]);
+
   const filteredPlants = plants.filter(p => {
     if (search.textQuery && !p.scientificName?.toLowerCase().includes(search.textQuery.toLowerCase())) return false;
+    if (search.family && p.family && !p.family.toLowerCase().includes(search.family.toLowerCase())) return false;
     
     if (search.plantClass && p.plantClass !== search.plantClass) return false;
     if (search.leafType && p.leafType !== search.leafType) return false;
@@ -229,6 +246,37 @@ export default function Home() {
           
           {/* Middle Column */}
           <div className="w-full md:w-1/3 flex flex-col gap-4">
+            <div className="relative">
+              <label className="text-purple-900 font-semibold mb-1 block">Family</label>
+              <input 
+                type="text" 
+                value={search.family || ''} 
+                onChange={(e) => {
+                  setSearch({...search, family: e.target.value});
+                  setFamilyDropdownOpen(true);
+                }}
+                onFocus={() => setFamilyDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setFamilyDropdownOpen(false), 200)}
+                placeholder="Search family..."
+                className="w-full p-1 rounded border border-purple-400 text-gray-900 bg-white"
+              />
+              {familyDropdownOpen && matchingFamilies.length > 0 && (
+                <ul className="absolute z-50 w-full mt-1 max-h-60 overflow-y-auto bg-white border border-purple-400 rounded shadow-lg">
+                  {matchingFamilies.map(f => (
+                    <li 
+                      key={f}
+                      className="px-3 py-1.5 text-sm cursor-pointer hover:bg-purple-100 text-gray-900"
+                      onClick={() => {
+                        setSearch({...search, family: f});
+                        setFamilyDropdownOpen(false);
+                      }}
+                    >
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <div>
               <label className="text-purple-900 font-semibold mb-1 block">Flower Colour</label>
               <select 
