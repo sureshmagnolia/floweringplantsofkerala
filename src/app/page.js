@@ -441,14 +441,28 @@ export default function Home() {
                 </div>
 
                 {/* Right Side: Big Image */}
-                <div className="flex-1 w-full border-2 border-purple-900 rounded bg-black flex items-center justify-center min-h-[250px] max-h-[300px] lg:min-h-[400px] lg:max-h-[500px] relative overflow-hidden">
+                <div 
+                  className="flex-1 w-full border-2 border-purple-900 rounded bg-black flex items-center justify-center min-h-[250px] max-h-[300px] lg:min-h-[400px] lg:max-h-[500px] relative overflow-hidden group cursor-pointer"
+                  onClick={() => {
+                    if (selectedPlant.images && selectedPlant.images.length > 0) {
+                      setPopupType('Image');
+                    }
+                  }}
+                >
                   {selectedPlant.images && selectedPlant.images.length > 0 ? (
-                    <img 
-                      src={selectedPlant.images[currentImageIndex].replace('https://drive.google.com/uc?id=', '/api/image?id=')} 
-                      alt={selectedPlant.scientificName} 
-                      className="object-contain w-full h-full" 
-                      referrerPolicy="no-referrer"
-                    />
+                    <>
+                      <img 
+                        src={selectedPlant.images[currentImageIndex].replace('https://drive.google.com/uc?id=', '/api/image?id=')} 
+                        alt={selectedPlant.scientificName} 
+                        className="object-contain w-full h-full transition-transform group-hover:scale-[1.02]" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center pointer-events-none">
+                        <div className="bg-black/60 text-white px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 text-sm font-semibold">
+                          <span>🔍</span> Click to enlarge
+                        </div>
+                      </div>
+                    </>
                   ) : (
                     <p className="text-gray-400 italic">Image missing.</p>
                   )}
@@ -459,7 +473,7 @@ export default function Home() {
           </div>
           
           {/* LEGACY POPUPS */}
-          {popupType && (
+          {popupType && popupType !== 'Image' && (
             <div className="fixed inset-0 flex items-center justify-center z-[60] pointer-events-none">
               <div className="bg-[#EAE4FF] border border-blue-400 rounded-sm shadow-xl w-full max-w-3xl flex flex-col pointer-events-auto" style={{ boxShadow: '2px 2px 10px rgba(0,0,0,0.5)' }}>
                 
@@ -495,6 +509,47 @@ export default function Home() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ENLARGED IMAGE POPUP */}
+      {selectedPlant && popupType === 'Image' && selectedPlant.images && selectedPlant.images.length > 0 && (
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[70] backdrop-blur-sm">
+          <button 
+            onClick={() => setPopupType(null)} 
+            className="absolute top-4 right-4 sm:top-8 sm:right-8 w-12 h-12 bg-white/10 hover:bg-red-500 rounded-full text-white text-3xl flex items-center justify-center transition-colors z-50 shadow-lg"
+          >
+            &times;
+          </button>
+          
+          <div className="relative w-full h-full flex items-center justify-center p-4 sm:p-12">
+            <img 
+              src={selectedPlant.images[currentImageIndex].replace('https://drive.google.com/uc?id=', '/api/image?id=')} 
+              alt={selectedPlant.scientificName} 
+              className="max-w-full max-h-full object-contain rounded drop-shadow-2xl" 
+              referrerPolicy="no-referrer"
+            />
+            
+            {selectedPlant.images.length > 1 && (
+              <>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : selectedPlant.images.length - 1)); }}
+                  className="absolute left-2 sm:left-8 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-16 sm:h-16 bg-black/50 hover:bg-white/20 border border-white/20 text-white rounded-full transition-all text-xl sm:text-2xl flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                >
+                  &#10094;
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setCurrentImageIndex((prev) => (prev < selectedPlant.images.length - 1 ? prev + 1 : 0)); }}
+                  className="absolute right-2 sm:right-8 top-1/2 -translate-y-1/2 w-12 h-12 sm:w-16 sm:h-16 bg-black/50 hover:bg-white/20 border border-white/20 text-white rounded-full transition-all text-xl sm:text-2xl flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.5)]"
+                >
+                  &#10095;
+                </button>
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 px-4 py-2 rounded-full text-white font-mono text-sm border border-white/20 shadow-lg">
+                  {currentImageIndex + 1} / {selectedPlant.images.length}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
