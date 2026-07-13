@@ -89,6 +89,13 @@ export default function Home() {
     }
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('keralaPlantsAuthTime');
+    localStorage.removeItem('keralaPlantsPassword');
+    setIsAuthenticated(false);
+    setPlants([]);
+  };
+
   const handleFlagChange = (flag) => {
     setSearch({
       ...search,
@@ -159,12 +166,20 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <span>🌸</span> Advanced Search
           </div>
-          <button 
-            onClick={resetFilters} 
-            className="bg-red-500 hover:bg-red-600 text-sm px-4 py-1 rounded shadow text-white transition-colors border border-red-700"
-          >
-            Reset Filters
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={resetFilters} 
+              className="bg-red-500 hover:bg-red-600 text-sm px-4 py-1 rounded shadow text-white transition-colors border border-red-700"
+            >
+              Reset Filters
+            </button>
+            <button 
+              onClick={handleLogout} 
+              className="bg-red-500 hover:bg-red-600 px-4 py-1 text-sm font-semibold rounded shadow transition-colors"
+            >
+              Logout
+            </button>
+          </div>
         </div>
         
         <div className="flex flex-col md:flex-row p-6 gap-6">
