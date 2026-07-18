@@ -495,10 +495,10 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
             {/* Modal Header */}
             <div className="flex items-start justify-between p-4 sm:px-6 border-b border-slate-100 dark:border-slate-800 gap-4">
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white break-words">
                   {selectedPlant.scientificName}
                 </h2>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 truncate">
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 break-words mt-1">
                   {selectedPlant.family}
                 </p>
               </div>
