@@ -493,12 +493,12 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 sm:px-6 border-b border-slate-100 dark:border-slate-800">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate pr-4">
+            <div className="flex items-start justify-between p-4 sm:px-6 border-b border-slate-100 dark:border-slate-800 gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate">
                   {selectedPlant.scientificName}
                 </h2>
-                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 truncate">
                   {selectedPlant.family}
                 </p>
               </div>
