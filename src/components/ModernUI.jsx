@@ -1,10 +1,29 @@
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+
+import { Capacitor } from '@capacitor/core';
 
 const ImageWithLoading = ({ src, alt, className, imgClassName, referrerPolicy, onClick, style }) => {
   const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => { setIsLoading(true); }, [src]);
+  const [actualSrc, setActualSrc] = useState(null);
+
+  useEffect(() => { 
+    setIsLoading(true); 
+    if (Capacitor.isNativePlatform() && src && !src.startsWith('http') && !src.startsWith('/api')) {
+      import('../lib/offlineManager').then(({ OfflineDataManager }) => {
+        OfflineDataManager.getImage({ filename: src }).then(res => {
+          setActualSrc(res.data);
+        }).catch(err => {
+          console.error("Offline image load error:", err);
+          setActualSrc(src); // Fallback
+        });
+      });
+    } else {
+      setActualSrc(src);
+    }
+  }, [src]);
+
   return (
     <div className={`relative flex items-center justify-center ${className || ''}`} onClick={onClick}>
       {isLoading && (
@@ -12,25 +31,34 @@ const ImageWithLoading = ({ src, alt, className, imgClassName, referrerPolicy, o
           <span className="text-sm text-slate-200 font-medium animate-pulse bg-black/60 px-3 py-1 rounded-full">Loading...</span>
         </div>
       )}
-      <img
-        src={src}
+      {actualSrc && <img
+        src={actualSrc}
         alt={alt}
         className={`${imgClassName || ''} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
         referrerPolicy={referrerPolicy}
         onLoad={() => setIsLoading(false)}
         style={style}
-      />
+      />}
     </div>
   );
 };
 
-export default function ModernUI({ plants, handleLogout, isModern, setIsModern }) {
+export default function ModernUI({ plants, handleLogout, isNative }) {
   
   // Modal state
   const [selectedPlant, setSelectedPlant] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [isZoomed, setIsZoomed] = useState(false);
+  
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const listRef = useRef(null);
+  
+  const scrollToTop = () => {
+    if (listRef.current) {
+      listRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   const getImageUrl = (url) => {
     if (!url) return '';
@@ -44,6 +72,7 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
   // Search state
   const defaultSearchState = {
     textQuery: '',
+    searchVernacular: false,
     nameType: '', 
     plantClass: '', 
     leafType: '', 
@@ -106,14 +135,22 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
 
   const filteredPlants = useMemo(() => {
     return plants.filter(p => {
-      if (search.textQuery && !p.scientificName?.toLowerCase().includes(search.textQuery.toLowerCase())) return false;
+      if (search.textQuery) {
+        const query = search.textQuery.toLowerCase();
+        if (search.searchVernacular) {
+          if (!p.vernacularName?.toLowerCase().includes(query)) return false;
+        } else {
+          if (!p.scientificName?.toLowerCase().includes(query)) return false;
+        }
+      }
+      
       if (search.family && (!p.family || !p.family.toLowerCase().includes(search.family.toLowerCase()))) return false;
       
-      if (search.plantClass && p.plantClass !== search.plantClass) return false;
-      if (search.leafType && p.leafType !== search.leafType) return false;
-      if (search.flowerType && p.flowerType !== search.flowerType) return false;
-      if (search.fruitType && p.fruitType !== search.fruitType) return false;
-      if (search.habit && p.habit !== search.habit) return false;
+      if (search.plantClass && (!p.plantClass || !p.plantClass.toLowerCase().includes(search.plantClass.toLowerCase()))) return false;
+      if (search.leafType && (!p.leafType || !p.leafType.toLowerCase().includes(search.leafType.toLowerCase()))) return false;
+      if (search.flowerType && (!p.flowerType || !p.flowerType.toLowerCase().includes(search.flowerType.toLowerCase()))) return false;
+      if (search.fruitType && (!p.fruitType || !p.fruitType.toLowerCase().includes(search.fruitType.toLowerCase()))) return false;
+      if (search.habit && (!p.habit || !p.habit.toLowerCase().includes(search.habit.toLowerCase()))) return false;
       
       if (search.conservationStatus && p.conservationStatus !== search.conservationStatus) return false;
       if (search.flowerColor && p.description && !p.description.toLowerCase().includes(search.flowerColor.toLowerCase())) return false;
@@ -144,26 +181,23 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-emerald-200">
       {/* Header */}
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <h1 className="text-xl font-bold flex items-center gap-2 text-slate-900 dark:text-white tracking-tight">
-            <span className="text-2xl">🌿</span> Kerala Plants
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-auto min-h-[4rem] py-2 flex items-center justify-between flex-wrap gap-2">
+          <h1 className="text-lg sm:text-xl font-bold flex items-center gap-1 sm:gap-2 text-slate-900 dark:text-white tracking-tight">
+            <span className="text-xl sm:text-2xl">🌿</span> <span className="hidden xs:inline sm:inline">Kerala Plants</span>
           </h1>
-          <div className="flex items-center gap-4">
-            <div className="text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 px-3 py-1 rounded-full uppercase tracking-wider">
-              {filteredPlants.length} Species
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap justify-end">
+            <div className="text-[10px] sm:text-xs font-semibold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 px-2 sm:px-3 py-1 rounded-full uppercase tracking-wider">
+              {filteredPlants.length} <span className="hidden sm:inline">Species</span>
             </div>
             
-            <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-full flex items-center cursor-pointer shadow-inner" onClick={() => setIsModern(!isModern)}>
-              <button className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-300 ${isModern ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>Modern</button>
-              <button className={`px-3 py-1 rounded-full text-xs font-bold transition-all duration-300 ${!isModern ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}>Legacy</button>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className="text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors uppercase tracking-wider"
-            >
-              Logout
-            </button>
+            {!isNative && (
+              <button
+                onClick={handleLogout}
+                className="text-[10px] sm:text-xs font-bold text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 transition-colors uppercase tracking-wider ml-1 sm:ml-0"
+              >
+                Logout
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -186,20 +220,6 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
               </div>
 
               <div className="space-y-4">
-                {/* Search */}
-                <div>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
-                    <input 
-                      type="text" 
-                      placeholder="Search scientific name..." 
-                      value={search.textQuery}
-                      onChange={(e) => setSearch({...search, textQuery: e.target.value})}
-                      className={`pl-9 ${inputClass}`}
-                    />
-                  </div>
-                </div>
-
                 <div className="relative">
                   <label className={labelClass}>Family</label>
                   <input 
@@ -298,12 +318,12 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
                   <label className={labelClass}>Properties</label>
                   <div className="flex flex-col gap-2 mt-2">
                     {[
-                      { key: 'endemic', label: 'Endemic', color: 'blue' },
-                      { key: 'medicinal', label: 'Medicinal', color: 'emerald' },
-                      { key: 'poisonous', label: 'Poisonous', color: 'red' },
-                      { key: 'edible', label: 'Edible', color: 'orange' },
-                      { key: 'garden', label: 'Garden', color: 'purple' },
-                      { key: 'exotic', label: 'Exotic', color: 'indigo' },
+                      { key: 'endemic', label: 'Endemic', style: 'bg-blue-600 border-blue-600' },
+                      { key: 'medicinal', label: 'Medicinal', style: 'bg-emerald-600 border-emerald-600' },
+                      { key: 'poisonous', label: 'Poisonous', style: 'bg-red-600 border-red-600' },
+                      { key: 'edible', label: 'Edible', style: 'bg-orange-600 border-orange-600' },
+                      { key: 'garden', label: 'Garden', style: 'bg-purple-600 border-purple-600' },
+                      { key: 'exotic', label: 'Exotic', style: 'bg-indigo-600 border-indigo-600' },
                     ].map((config) => (
                       <label key={config.key} className="flex items-center gap-3 cursor-pointer group">
                         <div className="relative flex items-center">
@@ -316,7 +336,7 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
                             })}
                             className="peer sr-only"
                           />
-                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${search.flags[config.key] ? `bg-${config.color}-500 border-${config.color}-500` : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
+                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${search.flags[config.key] ? config.style : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
                             {search.flags[config.key] && <span className="text-white text-[10px]">✓</span>}
                           </div>
                         </div>
@@ -332,8 +352,37 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
           {/* Main List */}
           <div className="flex-1 flex flex-col h-[800px] lg:h-[calc(100vh-6rem)]">
             
+            {/* Search Bar - Moved above grid */}
+            <div className="mb-6">
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">🔍</span>
+                <input 
+                  type="text" 
+                  placeholder={search.searchVernacular ? "Search vernacular name..." : "Search scientific name..."}
+                  value={search.textQuery}
+                  onChange={(e) => setSearch({...search, textQuery: e.target.value})}
+                  className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-base"
+                />
+              </div>
+              <label className="flex items-center gap-2 mt-3 ml-2 cursor-pointer w-fit group">
+                <input 
+                  type="checkbox" 
+                  checked={search.searchVernacular}
+                  onChange={(e) => setSearch({...search, searchVernacular: e.target.checked})}
+                  className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 bg-white dark:bg-slate-800 dark:border-slate-600 cursor-pointer"
+                />
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
+                  Search by Vernacular Name
+                </span>
+              </label>
+            </div>
+
             {/* List Body */}
-            <div className="flex-1 overflow-y-auto pb-4">
+            <div 
+              ref={listRef}
+              onScroll={(e) => setShowScrollTop(e.target.scrollTop > 400)}
+              className="flex-1 overflow-y-auto pb-4 relative"
+            >
               {hasActiveFilter ? (
                 filteredPlants.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -344,14 +393,30 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
                           setSelectedPlant(plant);
                           setCurrentImageIndex(0);
                         }}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col group"
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col group overflow-hidden"
                       >
-                        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
-                          {plant.scientificName}
-                        </h3>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3 truncate">
-                          {plant.family}
-                        </p>
+                        {plant.images && plant.images.length > 0 ? (
+                          <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+                            <ImageWithLoading 
+                              src={getImageUrl(plant.images[0])} 
+                              alt={plant.scientificName}
+                              className="w-full h-full"
+                              imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                            <span className="text-4xl opacity-20">🌿</span>
+                          </div>
+                        )}
+                        <div className="p-4 flex flex-col flex-1">
+                          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors truncate">
+                            {plant.scientificName}
+                          </h3>
+                          <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3 truncate">
+                            {plant.family}
+                          </p>
                         
                         <div className="mt-auto flex flex-wrap gap-1.5">
                           <span className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded">
@@ -365,6 +430,7 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
                           {plant.flags.endemic && (
                             <span className="text-[10px] font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded">Endemic</span>
                           )}
+                        </div>
                         </div>
                       </div>
                     ))}
@@ -506,8 +572,7 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
                   { label: "Habitat", value: selectedPlant.habitat },
                   { label: "Flowering & Fruiting", value: selectedPlant.phenology },
                   { label: "Distribution", value: selectedPlant.distribution },
-                  { label: "Localities", value: selectedPlant.districts },
-                  { label: "Status", value: selectedPlant.conservationStatus }
+                  { label: "Localities", value: selectedPlant.districts }
                 ].map((item, idx) => item.value && (
                   <div key={idx} className="bg-slate-50 dark:bg-slate-950 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
                     <span className="block text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-0.5">{item.label}</span>
@@ -516,19 +581,42 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
                 ))}
               </div>
 
-              {/* Properties / Flags */}
-              <div className="mt-4 flex flex-wrap gap-2">
+              {/* Properties / Flags & Conservation */}
+              <div className="mt-4 flex flex-wrap gap-2 items-center">
+                {selectedPlant.conservationStatus && (() => {
+                  const status = selectedPlant.conservationStatus.trim();
+                  let styles = "bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-600";
+                  
+                  if (status === 'CR' || status.includes('Critically Endangered')) {
+                    styles = "bg-red-100 text-red-900 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800";
+                  } else if (status === 'EN' || status.includes('Endangered')) {
+                    styles = "bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-800";
+                  } else if (status === 'VU' || status.includes('Vulnerable')) {
+                    styles = "bg-yellow-100 text-yellow-900 border-yellow-400 dark:bg-yellow-900/40 dark:text-yellow-300 dark:border-yellow-700";
+                  } else if (status === 'NT' || status.includes('Near Threatened')) {
+                    styles = "bg-lime-100 text-lime-900 border-lime-400 dark:bg-lime-900/40 dark:text-lime-300 dark:border-lime-700";
+                  } else if (status === 'LC' || status.includes('Least Concern')) {
+                    styles = "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-800";
+                  }
+
+                  return (
+                    <span className={`text-xs font-extrabold px-3 py-1.5 rounded-full border shadow-sm ${styles}`}>
+                      🛡️ {status}
+                    </span>
+                  );
+                })()}
+
                 {[
-                  { key: 'endemic', label: 'Endemic', color: 'blue' },
-                  { key: 'medicinal', label: 'Medicinal', color: 'emerald' },
-                  { key: 'poisonous', label: 'Poisonous', color: 'red' },
-                  { key: 'edible', label: 'Edible', color: 'orange' },
-                  { key: 'garden', label: 'Garden', color: 'purple' },
-                  { key: 'exotic', label: 'Exotic', color: 'indigo' },
+                  { key: 'endemic', label: 'Endemic', style: 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-900/40 dark:text-blue-300 dark:border-blue-700' },
+                  { key: 'medicinal', label: 'Medicinal', style: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-700' },
+                  { key: 'poisonous', label: 'Poisonous', style: 'bg-red-100 text-red-900 border-red-300 dark:bg-red-900/40 dark:text-red-300 dark:border-red-700' },
+                  { key: 'edible', label: 'Edible', style: 'bg-orange-100 text-orange-900 border-orange-300 dark:bg-orange-900/40 dark:text-orange-300 dark:border-orange-700' },
+                  { key: 'garden', label: 'Garden', style: 'bg-purple-100 text-purple-900 border-purple-300 dark:bg-purple-900/40 dark:text-purple-300 dark:border-purple-700' },
+                  { key: 'exotic', label: 'Exotic', style: 'bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-300 dark:border-indigo-700' },
                 ].filter(flag => selectedPlant.flags?.[flag.key]).map((flag) => (
                   <span 
                     key={flag.key} 
-                    className={`text-xs font-bold px-2.5 py-1 rounded-md border bg-${flag.color}-50 dark:bg-${flag.color}-900/20 text-${flag.color}-700 dark:text-${flag.color}-400 border-${flag.color}-200 dark:border-${flag.color}-800/50`}
+                    className={`text-xs font-extrabold px-3 py-1.5 rounded-full border shadow-sm ${flag.style}`}
                   >
                     {flag.label}
                   </span>
@@ -562,14 +650,14 @@ export default function ModernUI({ plants, handleLogout, isModern, setIsModern }
       {/* Fullscreen Image Overlay */}
       {fullscreenImage && selectedPlant && selectedPlant.images && (
         <div 
-          className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 sm:p-8"
+          className="fixed inset-0 z-[60] bg-black/95 backdrop-blur-xl flex items-center justify-center p-2 sm:p-8"
           onClick={() => {
             setFullscreenImage(null);
             setIsZoomed(false);
           }}
         >
           <button 
-            className="absolute top-4 right-4 sm:top-8 sm:right-8 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-red-500 text-white transition-colors z-[70] text-3xl shadow-lg"
+            className="absolute top-2 right-2 sm:top-8 sm:right-8 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full bg-white/20 hover:bg-red-500 text-white transition-colors z-[70] text-2xl sm:text-3xl shadow-lg"
             onClick={(e) => {
               e.stopPropagation();
               setFullscreenImage(null);

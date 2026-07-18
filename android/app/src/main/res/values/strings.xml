@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">KERALA PLANTS</string>
+    <string name="title_activity_main">KERALA PLANTS</string>
+    <string name="package_name">com.sureshmagnolia.keralaplants</string>
+    <string name="custom_url_scheme">com.sureshmagnolia.keralaplants</string>
+</resources>

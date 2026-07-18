@@ -21,9 +21,12 @@ The `.ugi` tables were successfully migrated to a modern SQLite database (`D:\FP
 - **`plants.json`**: Located at `src/data/plants.json` in the Next.js app. This acts as the entire "database" for the web app, allowing instant, offline-capable filtering in the browser.
 
 ## 3. Image Mapping Architecture
-The legacy application did not store image filenames directly in the database. Instead, it used a strict 7-digit mathematical naming convention (e.g., `0001312.jpg`).
-- **First 4 Digits (`0001`)**: This strictly maps to the sequential `ROWID` of the plant in the `fl20102` table (sorted alphabetically). For example, `0001` = *Abelmoschus angulosus var. angulosus*.
-- **Last 3 Digits (`312`)**: Indicates the image type (leaf, flower, habit) and sequence number.
+The legacy application did not store image filenames directly in the database. Instead, it used a highly obfuscated mathematical formula derived from the database fields.
+- **Image Prefix**: By inspecting the raw strings of the legacy `Kerala Plants 2.0.exe` binary, the formula used for the image prefix was discovered to be: `imafile1 = ALLTRIM(REVERSE(STR(VAL(FLG27) + 2487)))`. 
+  - It takes the value from `FLG27` (in the `fl20103.ugi` table).
+  - Adds `2487` to it.
+  - Converts it to a string and **reverses** the string.
+- **Image Suffix**: The last 3 digits (e.g., `312`) indicated the image type (leaf, flower, habit) and sequence.
 - **Data Cleanup**: Out of 25,117 original "images", exactly 5,128 were identified as disguised RTF text documents and moved to `D:\FPK\invalid_images`. Exactly 19,989 genuine JPEGs remain in `D:\FPK\images`.
 
 ## 4. Modern Web App Architecture

@@ -2,19 +2,40 @@
 
 import { useState, useEffect } from 'react';
 import ModernUI from '../components/ModernUI';
-import LegacyUI from '../components/LegacyUI';
+import { Capacitor } from '@capacitor/core';
+import androidPlants from '../data/android_plants.json';
 
 export default function Home() {
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [plants, setPlants] = useState([]);
-  
-  const [isModern, setIsModern] = useState(true);
 
-  // Check localStorage on mount
+  // Android Offline Data State
+  const [isOfflineDataReady, setIsOfflineDataReady] = useState(false);
+  const [checkingData, setCheckingData] = useState(true);
+
+  const checkPasswordLocally = (pass) => {
+    const formatter = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
+    const parts = formatter.formatToParts(new Date());
+    const day = parts.find(p => p.type === 'day').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const year = parts.find(p => p.type === 'year').value;
+    const basePassword = `${day}${month}${year}`;
+    const expectedPassword = basePassword.split('').reverse().join('');
+    return pass === expectedPassword;
+  };
+
   useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      setPlants(androidPlants);
+      setIsAuthenticated(true);
+      setIsCheckingAuth(false);
+      return;
+    }
+
     const authTime = localStorage.getItem('keralaPlantsAuthTime');
     const authPass = localStorage.getItem('keralaPlantsPassword');
     const now = new Date().getTime();
@@ -30,7 +51,10 @@ export default function Home() {
           setPlants(data.data);
           setIsAuthenticated(true);
         }
-      });
+      })
+      .finally(() => setIsCheckingAuth(false));
+    } else {
+      setIsCheckingAuth(false);
     }
   }, []);
 
@@ -40,20 +64,31 @@ export default function Home() {
     setError('');
     
     try {
-      const res = await fetch('/api/authenticate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-      });
-      const data = await res.json();
-      
-      if (data.success) {
-        setPlants(data.data);
-        setIsAuthenticated(true);
-        localStorage.setItem('keralaPlantsAuthTime', new Date().getTime().toString());
-        localStorage.setItem('keralaPlantsPassword', password);
+      if (Capacitor.isNativePlatform()) {
+        if (checkPasswordLocally(password)) {
+          setPlants(androidPlants);
+          setIsAuthenticated(true);
+          localStorage.setItem('keralaPlantsAuthTime', new Date().getTime().toString());
+          localStorage.setItem('keralaPlantsPassword', password);
+        } else {
+          setError("Incorrect password");
+        }
       } else {
-        setError(data.error);
+        const res = await fetch('/api/authenticate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          setPlants(data.data);
+          setIsAuthenticated(true);
+          localStorage.setItem('keralaPlantsAuthTime', new Date().getTime().toString());
+          localStorage.setItem('keralaPlantsPassword', password);
+        } else {
+          setError(data.error);
+        }
       }
     } catch (err) {
       setError('An error occurred.');
@@ -68,6 +103,78 @@ export default function Home() {
     setIsAuthenticated(false);
     setPlants([]);
   };
+
+  // Check if offline data exists on Android
+  useEffect(() => {
+    if (isAuthenticated && Capacitor.isNativePlatform()) {
+      import('../lib/offlineManager').then(({ OfflineDataManager }) => {
+        OfflineDataManager.checkExists().then(res => {
+          setIsOfflineDataReady(res.exists);
+          setCheckingData(false);
+        }).catch(err => {
+          console.error(err);
+          setCheckingData(false);
+        });
+      });
+    }
+  }, [isAuthenticated]);
+
+  const handleDownloadOfflineData = () => {
+    import('../lib/offlineManager').then(({ OfflineDataManager }) => {
+      // Direct link to the zip on Hugging Face (assuming it's public)
+      OfflineDataManager.startDownload({ url: 'https://huggingface.co/datasets/sureshmagnolia/kerala-plants-images/resolve/main/images.zip?download=true' }).then(() => {
+        alert('Download started in background. Please wait for the notification, then refresh the app.');
+      }).catch(err => alert(err));
+    });
+  };
+
+  const handleCheckDownload = () => {
+    import('../lib/offlineManager').then(({ OfflineDataManager }) => {
+      OfflineDataManager.checkExists().then(res => {
+        if (res.exists) {
+          setIsOfflineDataReady(true);
+          alert('Dataset ready!');
+        } else {
+          alert('Dataset is still downloading. Please wait.');
+        }
+      }).catch(err => alert(err));
+    });
+  };
+
+  if (isCheckingAuth || checkingData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="text-emerald-600 font-semibold animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  // Show offline data download screen if native and data not ready
+  if (Capacitor.isNativePlatform() && !isOfflineDataReady) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4 text-center">
+        <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 max-w-sm w-full">
+           <h2 className="text-xl font-bold text-slate-900 mb-4">Offline Dataset Required</h2>
+           <p className="text-sm text-slate-600 mb-6">
+             To use Kerala Plants offline, you must download the images dataset (approx. 2 GB) once. 
+             This dataset will be stored internally and not shown in your device's gallery.
+           </p>
+           <button 
+             onClick={handleDownloadOfflineData}
+             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-lg mb-4"
+           >
+             Download Dataset Now
+           </button>
+           <button 
+             onClick={handleCheckDownload}
+             className="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-2.5 px-4 rounded-lg"
+           >
+             I have downloaded it, check again
+           </button>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -101,13 +208,11 @@ export default function Home() {
     );
   }
 
+
+
+  const isNative = typeof window !== 'undefined' ? Capacitor.isNativePlatform() : false;
+
   return (
-    <>
-      {isModern ? (
-        <ModernUI plants={plants} handleLogout={handleLogout} isModern={isModern} setIsModern={setIsModern} />
-      ) : (
-        <LegacyUI plants={plants} handleLogout={handleLogout} isModern={isModern} setIsModern={setIsModern} />
-      )}
-    </>
+    <ModernUI plants={plants} handleLogout={handleLogout} isNative={isNative} />
   );
 }

@@ -3,9 +3,28 @@
 import { useState, useMemo, useEffect } from 'react';
 import plantsData from '../data/plants.json';
 
+import { Capacitor } from '@capacitor/core';
+
 const ImageWithLoading = ({ src, alt, className, imgClassName, referrerPolicy, onClick, style }) => {
   const [isLoading, setIsLoading] = useState(true);
-  useEffect(() => { setIsLoading(true); }, [src]);
+  const [actualSrc, setActualSrc] = useState(null);
+
+  useEffect(() => { 
+    setIsLoading(true); 
+    if (Capacitor.isNativePlatform() && src && !src.startsWith('http') && !src.startsWith('/api')) {
+      import('../lib/offlineManager').then(({ OfflineDataManager }) => {
+        OfflineDataManager.getImage({ filename: src }).then(res => {
+          setActualSrc(res.data);
+        }).catch(err => {
+          console.error("Offline image load error:", err);
+          setActualSrc(src); // Fallback
+        });
+      });
+    } else {
+      setActualSrc(src);
+    }
+  }, [src]);
+
   return (
     <div className={`relative flex items-center justify-center ${className || ''}`} onClick={onClick}>
       {isLoading && (
@@ -13,19 +32,19 @@ const ImageWithLoading = ({ src, alt, className, imgClassName, referrerPolicy, o
           <span className="text-sm text-slate-800 bg-white/70 font-bold animate-pulse px-3 py-1 rounded-full border border-purple-300 shadow">Loading...</span>
         </div>
       )}
-      <img
-        src={src}
+      {actualSrc && <img
+        src={actualSrc}
         alt={alt}
         className={`${imgClassName || ''} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
         referrerPolicy={referrerPolicy}
         onLoad={() => setIsLoading(false)}
         style={style}
-      />
+      />}
     </div>
   );
 };
 
-export default function LegacyUI({ plants, handleLogout, isModern, setIsModern }) {
+export default function LegacyUI({ plants, handleLogout, isModern, setIsModern, isNative }) {
 // Modal state
   const [selectedPlant, setSelectedPlant] = useState(null);
   const [popupType, setPopupType] = useState(null); // 'citation', 'description', 'localities'
@@ -111,27 +130,29 @@ export default function LegacyUI({ plants, handleLogout, isModern, setIsModern }
   return (
     <div className="min-h-screen bg-purple-200 p-8 relative">
       <div className="max-w-6xl mx-auto bg-purple-300 rounded-lg shadow-xl overflow-hidden border-2 border-purple-400">
-        <div className="p-4 bg-purple-400 text-white font-bold text-lg flex justify-between items-center">
+        <div className="p-3 sm:p-4 bg-purple-400 text-white font-bold text-base sm:text-lg flex flex-wrap justify-between items-center gap-2">
           <div className="flex items-center gap-2">
-            <span>🌸</span> Advanced Search
+            <span>🌸</span> <span className="hidden xs:inline sm:inline">Advanced Search</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             <button 
               onClick={resetFilters} 
-              className="bg-red-500 hover:bg-red-600 text-sm px-4 py-1 rounded shadow text-white transition-colors border border-red-700"
+              className="bg-red-500 hover:bg-red-600 text-[10px] sm:text-sm px-2 sm:px-4 py-1 rounded shadow text-white transition-colors border border-red-700"
             >
-              Reset Filters
+              Reset
             </button>
             <div className="bg-purple-300 p-0.5 rounded flex items-center cursor-pointer shadow-inner" onClick={() => setIsModern(!isModern)}>
-              <button className={`px-2 py-1 rounded text-xs font-bold transition-all duration-300 ${isModern ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-800 hover:bg-purple-400/50'}`}>Modern</button>
-              <button className={`px-2 py-1 rounded text-xs font-bold transition-all duration-300 ${!isModern ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-800 hover:bg-purple-400/50'}`}>Legacy</button>
+              <button className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all duration-300 ${isModern ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-800 hover:bg-purple-400/50'}`}>Modern</button>
+              <button className={`px-2 py-1 rounded text-[10px] sm:text-xs font-bold transition-all duration-300 ${!isModern ? 'bg-purple-600 text-white shadow-sm' : 'text-purple-800 hover:bg-purple-400/50'}`}>Legacy</button>
             </div>
-            <button 
-              onClick={handleLogout} 
-              className="bg-red-500 hover:bg-red-600 px-4 py-1 text-sm font-semibold rounded shadow transition-colors"
-            >
-              Logout
-            </button>
+            {!isNative && (
+              <button 
+                onClick={handleLogout} 
+                className="bg-red-500 hover:bg-red-600 px-2 sm:px-4 py-1 text-[10px] sm:text-sm font-semibold rounded shadow transition-colors"
+              >
+                Logout
+              </button>
+            )}
           </div>
         </div>
         
@@ -457,10 +478,10 @@ export default function LegacyUI({ plants, handleLogout, isModern, setIsModern }
 
       {/* ENLARGED IMAGE POPUP */}
       {selectedPlant && popupType === 'Image' && selectedPlant.images && selectedPlant.images.length > 0 && (
-        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[70] backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/95 flex items-center justify-center z-[70] backdrop-blur-sm p-2 sm:p-4">
           <button 
             onClick={() => setPopupType(null)} 
-            className="absolute top-4 right-4 sm:top-8 sm:right-8 w-12 h-12 bg-white/10 hover:bg-red-500 rounded-full text-white text-3xl flex items-center justify-center transition-colors z-50 shadow-lg"
+            className="absolute top-2 right-2 sm:top-8 sm:right-8 w-10 h-10 sm:w-12 sm:h-12 bg-white/20 hover:bg-red-500 rounded-full text-white text-2xl sm:text-3xl flex items-center justify-center transition-colors z-[80] shadow-lg"
           >
             &times;
           </button>
