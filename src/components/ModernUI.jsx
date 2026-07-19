@@ -724,23 +724,21 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
             maxScale={5}
             centerOnInit={true}
             doubleClick={{ disabled: false, step: 1 }}
-            panning={{ disabled: !isZoomed }}
-            onTransformed={(ref) => setIsZoomed(ref.state.scale > 1)}
           >
             {({ resetTransform, state }) => (
               <div 
                 className="w-full h-full flex items-center justify-center cursor-move"
                 onClick={(e) => e.stopPropagation()}
-                onTouchStart={(e) => {
+                onTouchStartCapture={(e) => {
                   if (state.scale > 1) return;
                   setTouchEnd(null);
                   setTouchStart(e.targetTouches[0].clientX);
                 }}
-                onTouchMove={(e) => {
+                onTouchMoveCapture={(e) => {
                   if (state.scale > 1) return;
                   setTouchEnd(e.targetTouches[0].clientX);
                 }}
-                onTouchEnd={() => {
+                onTouchEndCapture={(e) => {
                   if (state.scale > 1) return;
                   if (!touchStart || !touchEnd) return;
                   const distance = touchStart - touchEnd;
@@ -750,13 +748,11 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                     setCurrentImageIndex(newIdx);
                     setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
                     resetTransform();
-                    setIsZoomed(false);
                   } else if (distance < -minSwipeDistance) {
                     const newIdx = currentImageIndex > 0 ? currentImageIndex - 1 : selectedPlant.images.length - 1;
                     setCurrentImageIndex(newIdx); 
                     setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
                     resetTransform();
-                    setIsZoomed(false);
                   }
                 }}
               >
