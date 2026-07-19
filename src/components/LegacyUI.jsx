@@ -5,6 +5,8 @@ import plantsData from '../data/plants.json';
 
 import { Capacitor } from '@capacitor/core';
 
+const BINOMIAL_REGEX = /(?:^|\r?\n)([A-Z][a-z]+(?:\s+[a-z-]+(?:\s+(?:var\.|subsp\.|f\.)\s+[a-z-]+)?)?)/g;
+
 const ImageWithLoading = ({ src, alt, className, imgClassName, referrerPolicy, onClick, style }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [actualSrc, setActualSrc] = useState(null);
@@ -102,7 +104,15 @@ export default function LegacyUI({ plants, handleLogout, isModern, setIsModern, 
   }, [search.family, uniqueFamilies]);
 
   const filteredPlants = plants.filter(p => {
-    if (search.textQuery && !p.scientificName?.toLowerCase().includes(search.textQuery.toLowerCase())) return false;
+    if (search.textQuery) {
+      const query = search.textQuery.toLowerCase();
+      let matched = p.scientificName?.toLowerCase().includes(query);
+      if (!matched && p.citation) {
+        const citationMatches = [...p.citation.matchAll(BINOMIAL_REGEX)];
+        matched = citationMatches.some(m => m[1] && m[1].toLowerCase().includes(query));
+      }
+      if (!matched) return false;
+    }
     if (search.family && (!p.family || !p.family.toLowerCase().includes(search.family.toLowerCase()))) return false;
     
     if (search.plantClass && p.plantClass !== search.plantClass) return false;

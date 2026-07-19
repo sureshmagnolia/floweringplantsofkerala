@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 
 import { Capacitor } from '@capacitor/core';
 
+const BINOMIAL_REGEX = /(?:^|\r?\n)([A-Z][a-z]+(?:\s+[a-z-]+(?:\s+(?:var\.|subsp\.|f\.)\s+[a-z-]+)?)?)/g;
+
 const ImageWithLoading = ({ src, alt, className, imgClassName, referrerPolicy, onClick, style }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [actualSrc, setActualSrc] = useState(null);
@@ -140,7 +142,12 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
         if (search.searchVernacular) {
           if (!p.vernacularName?.toLowerCase().includes(query)) return false;
         } else {
-          if (!p.scientificName?.toLowerCase().includes(query)) return false;
+          let matched = p.scientificName?.toLowerCase().includes(query);
+          if (!matched && p.citation) {
+            const citationMatches = [...p.citation.matchAll(BINOMIAL_REGEX)];
+            matched = citationMatches.some(m => m[1] && m[1].toLowerCase().includes(query));
+          }
+          if (!matched) return false;
         }
       }
       
