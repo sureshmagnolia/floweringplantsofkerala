@@ -210,8 +210,8 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
 
   // Pagination removed, using Virtualization
 
-  const inputClass = "w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 dark:text-slate-100 shadow-sm transition-all appearance-none";
-  const labelClass = "block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5";
+  const inputClass = "w-full px-2 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 dark:text-slate-100 shadow-sm transition-all appearance-none";
+  const labelClass = "block text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1";
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans selection:bg-emerald-200">
@@ -242,31 +242,22 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
           
-          {/* Sidebar / Filters (Accordion on Mobile, Sidebar on Desktop) */}
-          <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-4">
-            <div className="bg-white dark:bg-slate-900 p-4 lg:p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
-              <div 
-                className="flex items-center justify-between lg:mb-5 cursor-pointer lg:cursor-default select-none"
-                onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
-              >
-                <h2 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                  <span className="lg:hidden text-lg w-5 flex justify-center">
-                    {isMobileFiltersOpen ? '✕' : '☰'}
-                  </span> 
+          {/* Sidebar / Filters */}
+          <aside className="w-full lg:w-64 flex-shrink-0 flex flex-col gap-3">
+            <div className="bg-white dark:bg-slate-900 p-3 lg:p-4 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between lg:mb-4">
+                <h2 className="font-bold text-slate-800 dark:text-slate-200 text-sm">
                   Filters
                 </h2>
-                <div className="flex items-center gap-4">
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); resetFilters(); }} 
-                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors uppercase tracking-wider"
-                  >
-                    Reset
-                  </button>
-                  <span className="lg:hidden text-slate-400 text-sm">{isMobileFiltersOpen ? '🔼' : '🔽'}</span>
-                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); resetFilters(); }} 
+                  className="text-[10px] text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors uppercase tracking-wider"
+                >
+                  Reset
+                </button>
               </div>
 
-              <div className={`space-y-4 mt-4 lg:mt-0 max-h-[60vh] lg:max-h-none overflow-y-auto overscroll-contain pr-1 custom-scrollbar ${isMobileFiltersOpen ? 'block' : 'hidden lg:block'}`}>
+              <div className="space-y-2 mt-3 lg:mt-0 max-h-[40vh] lg:max-h-none overflow-y-auto overscroll-contain pr-1 custom-scrollbar">
                 <div className="relative">
                   <label className={labelClass}>Family</label>
                   <input 
@@ -306,7 +297,7 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                   </select>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className={labelClass}>Leaf</label>
                     <select className={inputClass} value={search.leafType} onChange={(e) => setSearch({...search, leafType: e.target.value})}>
@@ -321,7 +312,7 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className={labelClass}>Fruit</label>
                     <select className={inputClass} value={search.fruitType} onChange={(e) => setSearch({...search, fruitType: e.target.value})}>
@@ -383,11 +374,11 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                             })}
                             className="peer sr-only"
                           />
-                          <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${search.flags[config.key] ? config.style : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
-                            {search.flags[config.key] && <span className="text-white text-[10px]">✓</span>}
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${search.flags[config.key] ? config.style : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
+                            {search.flags[config.key] && <span className="text-white text-[8px]">✓</span>}
                           </div>
                         </div>
-                        <span className={`text-sm font-medium ${search.flags[config.key] ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>{config.label}</span>
+                        <span className={`text-xs font-medium ${search.flags[config.key] ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>{config.label}</span>
                       </label>
                     ))}
                   </div>
