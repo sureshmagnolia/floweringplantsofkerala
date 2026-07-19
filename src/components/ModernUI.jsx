@@ -69,6 +69,8 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [fullscreenImage, setFullscreenImage] = useState(null);
   const [isZoomed, setIsZoomed] = useState(false);
+  const [touchStart, setTouchStart] = useState(null);
+  const [touchEnd, setTouchEnd] = useState(null);
   
   const [showScrollTop, setShowScrollTop] = useState(false);
   const listRef = useRef(null);
@@ -670,6 +672,29 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
           onClick={() => {
             setFullscreenImage(null);
             setIsZoomed(false);
+          }}
+          onTouchStart={(e) => {
+            setTouchEnd(null);
+            setTouchStart(e.targetTouches[0].clientX);
+          }}
+          onTouchMove={(e) => setTouchEnd(e.targetTouches[0].clientX)}
+          onTouchEnd={() => {
+            if (!touchStart || !touchEnd) return;
+            const distance = touchStart - touchEnd;
+            const minSwipeDistance = 50;
+            if (distance > minSwipeDistance) {
+              // Left swipe -> Next
+              const newIdx = currentImageIndex < selectedPlant.images.length - 1 ? currentImageIndex + 1 : 0;
+              setCurrentImageIndex(newIdx);
+              setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
+              setIsZoomed(false);
+            } else if (distance < -minSwipeDistance) {
+              // Right swipe -> Previous
+              const newIdx = currentImageIndex > 0 ? currentImageIndex - 1 : selectedPlant.images.length - 1;
+              setCurrentImageIndex(newIdx); 
+              setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
+              setIsZoomed(false);
+            }
           }}
         >
           <button 
