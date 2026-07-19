@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useDeferredValue, forwardRef } from 'react';
+import { VirtuosoGrid } from 'react-virtuoso';
 
 import { Capacitor } from '@capacitor/core';
 
@@ -53,6 +54,7 @@ const ImageWithLoading = ({ src, alt, className, imgClassName, referrerPolicy, o
         alt={alt}
         className={`${imgClassName || ''} ${isLoading ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}
         referrerPolicy={referrerPolicy}
+        loading="lazy"
         onLoad={() => setIsLoading(false)}
         style={style}
       />}
@@ -70,6 +72,27 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
   
   const [showScrollTop, setShowScrollTop] = useState(false);
   const listRef = useRef(null);
+
+  useEffect(() => {
+    let listener = null;
+    if (Capacitor.isNativePlatform()) {
+      import('@capacitor/app').then(({ App }) => {
+        App.addListener('backButton', () => {
+          if (fullscreenImage) {
+            setFullscreenImage(null);
+            setIsZoomed(false);
+          } else if (selectedPlant) {
+            setSelectedPlant(null);
+          } else {
+            App.exitApp();
+          }
+        }).then(l => { listener = l; });
+      }).catch(err => console.error("Failed to load Capacitor App plugin", err));
+    }
+    return () => {
+      if (listener) listener.remove();
+    };
+  }, [fullscreenImage, selectedPlant]);
   
   const scrollToTop = () => {
     if (listRef.current) {
@@ -105,6 +128,7 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
     }
   };
   const [search, setSearch] = useState(defaultSearchState);
+  const deferredSearch = useDeferredValue(search);
 
   const resetFilters = () => setSearch(defaultSearchState);
 
@@ -113,15 +137,15 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [search]);
+  }, [deferredSearch]);
 
   const hasActiveFilter = useMemo(() => {
-    if (search.textQuery.trim().length >= 3) return true;
-    if (search.family && search.family.trim().length > 0) return true;
-    if (search.plantClass || search.leafType || search.flowerType || search.fruitType || search.habit || search.flowerColor || search.conservationStatus || search.habitat) return true;
-    if (Object.values(search.flags).some(v => v === true)) return true;
+    if (deferredSearch.textQuery.trim().length >= 3) return true;
+    if (deferredSearch.family && deferredSearch.family.trim().length > 0) return true;
+    if (deferredSearch.plantClass || deferredSearch.leafType || deferredSearch.flowerType || deferredSearch.fruitType || deferredSearch.habit || deferredSearch.flowerColor || deferredSearch.conservationStatus || deferredSearch.habitat) return true;
+    if (Object.values(deferredSearch.flags).some(v => v === true)) return true;
     return false;
-  }, [search]);
+  }, [deferredSearch]);
 
 
   const handleFlagChange = (flag) => {
@@ -143,18 +167,18 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
   }, [plants]);
 
   const matchingFamilies = useMemo(() => {
-    if (!search.family || search.family.length < 3) return [];
-    const lowerQuery = search.family.toLowerCase();
+    if (!deferredSearch.family || deferredSearch.family.length < 3) return [];
+    const lowerQuery = deferredSearch.family.toLowerCase();
     const matches = uniqueFamilies.filter(f => f.toLowerCase().includes(lowerQuery));
     if (matches.length === 1 && matches[0].toLowerCase() === lowerQuery) return [];
     return matches;
-  }, [search.family, uniqueFamilies]);
+  }, [deferredSearch.family, uniqueFamilies]);
 
   const filteredPlants = useMemo(() => {
     return plants.filter(p => {
-      if (search.textQuery) {
-        const query = search.textQuery.toLowerCase();
-        if (search.searchVernacular) {
+      if (deferredSearch.textQuery) {
+        const query = deferredSearch.textQuery.toLowerCase();
+        if (deferredSearch.searchVernacular) {
           if (!p.vernacularName?.toLowerCase().includes(query)) return false;
         } else {
           let matched = p.scientificName?.toLowerCase().includes(query);
@@ -166,35 +190,26 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
         }
       }
       
-      if (search.family && (!p.family || !p.family.toLowerCase().includes(search.family.toLowerCase()))) return false;
+      if (deferredSearch.family && (!p.family || !p.family.toLowerCase().includes(deferredSearch.family.toLowerCase()))) return false;
       
-      if (search.plantClass && (!p.plantClass || !p.plantClass.toLowerCase().includes(search.plantClass.toLowerCase()))) return false;
-      if (search.leafType && (!p.leafType || !p.leafType.toLowerCase().includes(search.leafType.toLowerCase()))) return false;
-      if (search.flowerType && (!p.flowerType || !p.flowerType.toLowerCase().includes(search.flowerType.toLowerCase()))) return false;
-      if (search.fruitType && (!p.fruitType || !p.fruitType.toLowerCase().includes(search.fruitType.toLowerCase()))) return false;
-      if (search.habit && (!p.habit || !p.habit.toLowerCase().includes(search.habit.toLowerCase()))) return false;
+      if (deferredSearch.plantClass && p.plantClass !== deferredSearch.plantClass) return false;
+      if (deferredSearch.leafType && p.leafType !== deferredSearch.leafType) return false;
+      if (deferredSearch.flowerType && p.flowerType !== deferredSearch.flowerType) return false;
+      if (deferredSearch.fruitType && p.fruitType !== deferredSearch.fruitType) return false;
+      if (deferredSearch.habit && p.habit !== deferredSearch.habit) return false;
       
-      if (search.conservationStatus && p.conservationStatus !== search.conservationStatus) return false;
-      if (search.flowerColor && p.description && !p.description.toLowerCase().includes(search.flowerColor.toLowerCase())) return false;
-      if (search.habitat && p.habitat && !p.habitat.toLowerCase().includes(search.habitat.toLowerCase())) return false;
+      if (deferredSearch.flowerColor && (!p.description || !p.description.toLowerCase().includes(deferredSearch.flowerColor.toLowerCase()))) return false;
+      if (deferredSearch.conservationStatus && (!p.conservationStatus || !p.conservationStatus.includes(deferredSearch.conservationStatus))) return false;
+      if (deferredSearch.habitat && (!p.habitat || !p.habitat.toLowerCase().includes(deferredSearch.habitat.toLowerCase()))) return false;
   
-      if (search.flags.garden && !p.flags.garden) return false;
-      if (search.flags.medicinal && !p.flags.medicinal) return false;
-      if (search.flags.edible && !p.flags.edible) return false;
-      if (search.flags.poisonous && !p.flags.poisonous) return false;
-      if (search.flags.exotic && !p.flags.exotic) return false;
-      if (search.flags.endemic && !p.flags.endemic) return false;
+      for (const [flag, isSet] of Object.entries(deferredSearch.flags)) {
+        if (isSet && !p.flags?.[flag]) return false;
+      }
       return true;
     });
-  }, [plants, search]);
+  }, [plants, deferredSearch]);
 
-  const paginatedPlants = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredPlants.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredPlants, currentPage]);
-
-  const totalPages = Math.ceil(filteredPlants.length / itemsPerPage);
-
+  // Pagination removed, using Virtualization
 
   const inputClass = "w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-slate-900 dark:text-slate-100 shadow-sm transition-all appearance-none";
   const labelClass = "block text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-1.5";
@@ -407,18 +422,27 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
             >
               {hasActiveFilter ? (
                 filteredPlants.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {paginatedPlants.map((plant, i) => (
+                  <VirtuosoGrid
+                    style={{ height: '100%', minHeight: '400px' }}
+                    data={filteredPlants}
+                    components={{
+                      List: forwardRef(({ style, children, ...props }, ref) => (
+                        <div ref={ref} {...props} style={style} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
+                          {children}
+                        </div>
+                      ))
+                    }}
+                    itemContent={(i, plant) => (
                       <div 
-                        key={i} 
+                        key={plant.id || i}
                         onClick={() => {
                           setSelectedPlant(plant);
                           setCurrentImageIndex(0);
                         }}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col group overflow-hidden"
+                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col group overflow-hidden h-full"
                       >
                         {plant.images && plant.images.length > 0 ? (
-                          <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 relative overflow-hidden">
+                          <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 relative overflow-hidden shrink-0">
                             <ImageWithLoading 
                               src={getImageUrl(plant.images[0])} 
                               alt={plant.scientificName}
@@ -428,7 +452,7 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                             />
                           </div>
                         ) : (
-                          <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                          <div className="w-full h-48 bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
                             <span className="text-4xl opacity-20">🌿</span>
                           </div>
                         )}
@@ -455,8 +479,8 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                         </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  />
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-center p-8">
                     <div className="w-16 h-16 mb-4 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-2xl">
@@ -476,33 +500,6 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                 </div>
               )}
             </div>
-
-            {/* Pagination Controls */}
-            {hasActiveFilter && filteredPlants.length > 0 && (
-              <div className="py-4 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 mt-auto">
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                  Showing <span className="text-slate-900 dark:text-white font-bold">{Math.min(filteredPlants.length, (currentPage - 1) * itemsPerPage + 1)}</span> to <span className="text-slate-900 dark:text-white font-bold">{Math.min(filteredPlants.length, currentPage * itemsPerPage)}</span> of <span className="text-slate-900 dark:text-white font-bold">{filteredPlants.length}</span>
-                </span>
-                
-                <div className="flex gap-2">
-                  <button 
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors"
-                  >
-                    Previous
-                  </button>
-                  <button 
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    className="px-4 py-2 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 shadow-sm transition-colors"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-
           </div>
         </div>
       </main>

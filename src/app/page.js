@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import ModernUI from '../components/ModernUI';
 import { Capacitor } from '@capacitor/core';
-import androidPlants from '../data/android_plants.json';
 
 export default function Home() {
   const [password, setPassword] = useState('');
@@ -30,9 +29,17 @@ export default function Home() {
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
-      setPlants(androidPlants);
-      setIsAuthenticated(true);
-      setIsCheckingAuth(false);
+      fetch('/data/android_plants.json')
+        .then(res => res.json())
+        .then(data => {
+          setPlants(data);
+          setIsAuthenticated(true);
+          setIsCheckingAuth(false);
+        })
+        .catch(err => {
+          console.error("Failed to load local DB", err);
+          setIsCheckingAuth(false);
+        });
       return;
     }
 
@@ -66,7 +73,9 @@ export default function Home() {
     try {
       if (Capacitor.isNativePlatform()) {
         if (checkPasswordLocally(password)) {
-          setPlants(androidPlants);
+          const res = await fetch('/data/android_plants.json');
+          const data = await res.json();
+          setPlants(data);
           setIsAuthenticated(true);
           localStorage.setItem('keralaPlantsAuthTime', new Date().getTime().toString());
           localStorage.setItem('keralaPlantsPassword', password);
