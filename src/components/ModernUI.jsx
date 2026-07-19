@@ -4,7 +4,22 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 
 import { Capacitor } from '@capacitor/core';
 
-const BINOMIAL_REGEX = /(?:^|\r?\n)([A-Z][a-z]+(?:\s+[a-z-]+(?:\s+(?:var\.|subsp\.|f\.)\s+[a-z-]+)?)?)/g;
+const BINOMIAL_REGEX = /(?:^|\r?\n)([A-Z][a-z]+(?:\s+[a-z-]+(?:\s+(?:var\.|subsp\.|ssp\.|f\.)\s+[a-z-]+)?)?)/g;
+
+const formatCitationText = (citation) => {
+  if (!citation) return null;
+  
+  const lines = citation.split(/\r?\n/).filter(line => line.trim() !== '');
+  
+  return lines.map((line, index) => {
+    let formatted = line.replace(/^(\s*)([A-Z][a-z-]+(?:\s+[x×])?\s+[a-z-]+)/, '$1<i>$2</i>');
+    formatted = formatted.replace(/(\b(?:var\.|subsp\.|ssp\.|f\.|forma)\s+)([a-z-]+)/g, '$1<i>$2</i>');
+    
+    return (
+      <span key={index} className="block mb-3 last:mb-0" dangerouslySetInnerHTML={{ __html: formatted }} />
+    );
+  });
+};
 
 const ImageWithLoading = ({ src, alt, className, imgClassName, referrerPolicy, onClick, style }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -634,9 +649,9 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
               {selectedPlant.citation && (
                 <div className="mt-6">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-2">Citation</h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/30 italic">
-                    {selectedPlant.citation}
-                  </p>
+                  <div className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
+                    {formatCitationText(selectedPlant.citation)}
+                  </div>
                 </div>
               )}
 
