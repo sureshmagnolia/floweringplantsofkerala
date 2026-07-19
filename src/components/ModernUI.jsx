@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef, useDeferredValue, forwardRef } from 'react';
 import { VirtuosoGrid } from 'react-virtuoso';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 
 import { Capacitor } from '@capacitor/core';
 
@@ -673,29 +674,6 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
             setFullscreenImage(null);
             setIsZoomed(false);
           }}
-          onTouchStart={(e) => {
-            setTouchEnd(null);
-            setTouchStart(e.targetTouches[0].clientX);
-          }}
-          onTouchMove={(e) => setTouchEnd(e.targetTouches[0].clientX)}
-          onTouchEnd={() => {
-            if (!touchStart || !touchEnd) return;
-            const distance = touchStart - touchEnd;
-            const minSwipeDistance = 50;
-            if (distance > minSwipeDistance) {
-              // Left swipe -> Next
-              const newIdx = currentImageIndex < selectedPlant.images.length - 1 ? currentImageIndex + 1 : 0;
-              setCurrentImageIndex(newIdx);
-              setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
-              setIsZoomed(false);
-            } else if (distance < -minSwipeDistance) {
-              // Right swipe -> Previous
-              const newIdx = currentImageIndex > 0 ? currentImageIndex - 1 : selectedPlant.images.length - 1;
-              setCurrentImageIndex(newIdx); 
-              setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
-              setIsZoomed(false);
-            }
-          }}
         >
           <button 
             className="absolute top-2 right-2 sm:top-8 sm:right-8 w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center rounded-full bg-white/20 hover:bg-red-500 text-white transition-colors z-[70] text-2xl sm:text-3xl shadow-lg"
@@ -740,31 +718,57 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
             </>
           )}
 
-          <div 
-            className={`relative transition-all duration-300 ease-in-out cursor-pointer ${isZoomed ? 'w-full h-full' : 'max-w-full max-h-full'}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsZoomed(!isZoomed);
-            }}
-            style={{
-              width: isZoomed ? '100vw' : 'auto',
-              height: isZoomed ? '100vh' : 'auto',
-            }}
+          <TransformWrapper
+            initialScale={1}
+            minScale={1}
+            maxScale={5}
+            centerOnInit={true}
+            doubleClick={{ disabled: false, step: 1 }}
+            panning={{ velocityDisabled: true }}
           >
-            <div className={`w-full h-full ${isZoomed ? 'overflow-auto flex items-center justify-center' : 'flex items-center justify-center'}`}>
-              <ImageWithLoading 
-                src={fullscreenImage} 
-                alt="Fullscreen view"
-                className="w-full h-full"
-                imgClassName={`transition-all duration-300 ${isZoomed ? 'max-w-none scale-150 cursor-zoom-out' : 'max-w-full max-h-[100vh] object-contain cursor-zoom-in'}`}
-                referrerPolicy="no-referrer"
-                style={{
-                  maxWidth: isZoomed ? '200vw' : '100%',
-                  maxHeight: isZoomed ? '200vh' : '100%',
+            {({ resetTransform, state }) => (
+              <div 
+                className="w-full h-full flex items-center justify-center cursor-move"
+                onClick={(e) => e.stopPropagation()}
+                onTouchStart={(e) => {
+                  if (state.scale > 1) return;
+                  setTouchEnd(null);
+                  setTouchStart(e.targetTouches[0].clientX);
                 }}
-              />
-            </div>
-          </div>
+                onTouchMove={(e) => {
+                  if (state.scale > 1) return;
+                  setTouchEnd(e.targetTouches[0].clientX);
+                }}
+                onTouchEnd={() => {
+                  if (state.scale > 1) return;
+                  if (!touchStart || !touchEnd) return;
+                  const distance = touchStart - touchEnd;
+                  const minSwipeDistance = 50;
+                  if (distance > minSwipeDistance) {
+                    const newIdx = currentImageIndex < selectedPlant.images.length - 1 ? currentImageIndex + 1 : 0;
+                    setCurrentImageIndex(newIdx);
+                    setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
+                    resetTransform();
+                  } else if (distance < -minSwipeDistance) {
+                    const newIdx = currentImageIndex > 0 ? currentImageIndex - 1 : selectedPlant.images.length - 1;
+                    setCurrentImageIndex(newIdx); 
+                    setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
+                    resetTransform();
+                  }
+                }}
+              >
+                <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
+                  <ImageWithLoading 
+                    src={fullscreenImage} 
+                    alt="Fullscreen view"
+                    className="w-full h-full"
+                    imgClassName="w-full h-full max-h-[100vh] object-contain"
+                    referrerPolicy="no-referrer"
+                  />
+                </TransformComponent>
+              </div>
+            )}
+          </TransformWrapper>
         </div>
       )}
     </div>
