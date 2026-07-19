@@ -760,7 +760,10 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                   }
                 }}
               >
-                <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
+                <TransformComponent 
+                  wrapperStyle={{ width: '100%', height: '100%' }}
+                  contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
                   <ImageWithLoading 
                     src={fullscreenImage} 
                     alt="Fullscreen view"
