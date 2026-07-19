@@ -408,8 +408,16 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                   placeholder={search.searchVernacular ? "Search vernacular name..." : "Search scientific name..."}
                   value={search.textQuery}
                   onChange={(e) => setSearch({...search, textQuery: e.target.value})}
-                  className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-base"
+                  className="w-full pl-12 pr-12 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-base"
                 />
+                {search.textQuery && (
+                  <button
+                    onClick={() => setSearch({...search, textQuery: ''})}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 flex items-center justify-center w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors text-sm"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               <label className="flex items-center gap-2 mt-3 ml-2 cursor-pointer w-fit group">
                 <input 
