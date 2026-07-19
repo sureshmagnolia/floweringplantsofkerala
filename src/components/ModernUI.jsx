@@ -242,39 +242,31 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
           
-          {/* Sidebar / Filters (Bottom Sheet on Mobile, Sidebar on Desktop) */}
-          <aside className={`
-            fixed inset-0 z-50 flex flex-col justify-end bg-slate-900/40 backdrop-blur-sm transition-all duration-300
-            lg:static lg:bg-transparent lg:z-auto lg:flex lg:w-72 lg:flex-shrink-0 lg:gap-4 lg:backdrop-blur-none
-            ${isMobileFiltersOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none lg:opacity-100 lg:pointer-events-auto'}
-          `}>
-            {/* Click-away backdrop for mobile */}
-            <div className="absolute inset-0 lg:hidden" onClick={() => setIsMobileFiltersOpen(false)}></div>
-            
-            <div className={`
-              bg-white dark:bg-slate-900 w-full rounded-t-3xl p-6 shadow-2xl transition-transform duration-300 transform max-h-[85vh] overflow-y-auto flex flex-col relative z-10 custom-scrollbar
-              lg:rounded-2xl lg:p-5 lg:shadow-sm lg:border lg:border-slate-200 lg:dark:border-slate-800 lg:max-h-none lg:transform-none lg:overflow-visible
-              ${isMobileFiltersOpen ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
-            `}>
-              <div className="flex items-center justify-between mb-5 sticky top-0 bg-white dark:bg-slate-900 z-20 pb-2">
-                <h2 className="font-bold text-slate-800 dark:text-slate-200 text-lg">Filters</h2>
+          {/* Sidebar / Filters (Accordion on Mobile, Sidebar on Desktop) */}
+          <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col gap-4">
+            <div className="bg-white dark:bg-slate-900 p-4 lg:p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
+              <div 
+                className="flex items-center justify-between lg:mb-5 cursor-pointer lg:cursor-default select-none"
+                onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
+              >
+                <h2 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <span className="lg:hidden text-lg w-5 flex justify-center">
+                    {isMobileFiltersOpen ? '✕' : '☰'}
+                  </span> 
+                  Filters
+                </h2>
                 <div className="flex items-center gap-4">
                   <button 
-                    onClick={resetFilters} 
+                    onClick={(e) => { e.stopPropagation(); resetFilters(); }} 
                     className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors uppercase tracking-wider"
                   >
                     Reset
                   </button>
-                  <button 
-                    onClick={() => setIsMobileFiltersOpen(false)} 
-                    className="lg:hidden w-8 h-8 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 font-bold"
-                  >
-                    ✕
-                  </button>
+                  <span className="lg:hidden text-slate-400 text-sm">{isMobileFiltersOpen ? '🔼' : '🔽'}</span>
                 </div>
               </div>
 
-              <div className="space-y-4">
+              <div className={`space-y-4 mt-4 lg:mt-0 max-h-[60vh] lg:max-h-none overflow-y-auto overscroll-contain pr-1 custom-scrollbar ${isMobileFiltersOpen ? 'block' : 'hidden lg:block'}`}>
                 <div className="relative">
                   <label className={labelClass}>Family</label>
                   <input 
@@ -407,30 +399,17 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
           {/* Main List */}
           <div className="flex-1 flex flex-col h-[800px] lg:h-[calc(100vh-6rem)]">
             
-            {/* Search Bar & Mobile Filter Toggle */}
+            {/* Search Bar */}
             <div className="mb-6">
-              <div className="flex gap-3 items-start">
-                <div className="relative flex-1">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">🔍</span>
-                  <input 
-                    type="text" 
-                    placeholder={search.searchVernacular ? "Search vernacular name..." : "Search scientific name..."}
-                    value={search.textQuery}
-                    onChange={(e) => setSearch({...search, textQuery: e.target.value})}
-                    className="w-full pl-12 pr-4 h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-base"
-                  />
-                </div>
-                
-                {/* Mobile Filter Button */}
-                <button 
-                  onClick={() => setIsMobileFiltersOpen(true)}
-                  className="lg:hidden flex-shrink-0 flex items-center justify-center gap-2 h-12 px-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-700 dark:text-slate-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 active:scale-95 transition-transform relative"
-                >
-                  <span className="text-xl">🎛️</span>
-                  {hasActiveFilter && (
-                    <span className="absolute top-2 right-2 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900"></span>
-                  )}
-                </button>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg">🔍</span>
+                <input 
+                  type="text" 
+                  placeholder={search.searchVernacular ? "Search vernacular name..." : "Search scientific name..."}
+                  value={search.textQuery}
+                  onChange={(e) => setSearch({...search, textQuery: e.target.value})}
+                  className="w-full pl-12 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-slate-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-base"
+                />
               </div>
               <label className="flex items-center gap-2 mt-3 ml-2 cursor-pointer w-fit group">
                 <input 
