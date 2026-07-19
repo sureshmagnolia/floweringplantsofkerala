@@ -724,7 +724,8 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
             maxScale={5}
             centerOnInit={true}
             doubleClick={{ disabled: false, step: 1 }}
-            panning={{ velocityDisabled: true }}
+            panning={{ disabled: !isZoomed }}
+            onTransformed={(ref) => setIsZoomed(ref.state.scale > 1)}
           >
             {({ resetTransform, state }) => (
               <div 
@@ -749,11 +750,13 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                     setCurrentImageIndex(newIdx);
                     setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
                     resetTransform();
+                    setIsZoomed(false);
                   } else if (distance < -minSwipeDistance) {
                     const newIdx = currentImageIndex > 0 ? currentImageIndex - 1 : selectedPlant.images.length - 1;
                     setCurrentImageIndex(newIdx); 
                     setFullscreenImage(getImageUrl(selectedPlant.images[newIdx]));
                     resetTransform();
+                    setIsZoomed(false);
                   }
                 }}
               >
