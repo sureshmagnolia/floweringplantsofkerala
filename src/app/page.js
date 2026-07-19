@@ -14,7 +14,7 @@ export default function Home() {
 
   // Android Offline Data State
   const [isOfflineDataReady, setIsOfflineDataReady] = useState(false);
-  const [checkingData, setCheckingData] = useState(true);
+  const [checkingData, setCheckingData] = useState(typeof window !== 'undefined' ? Capacitor.isNativePlatform() : false);
 
   const checkPasswordLocally = (pass) => {
     const formatter = new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' });
