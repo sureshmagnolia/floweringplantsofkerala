@@ -132,12 +132,7 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
 
   const resetFilters = () => setSearch(defaultSearchState);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [deferredSearch]);
+  // Pagination removed
 
   const hasActiveFilter = useMemo(() => {
     if (deferredSearch.textQuery.trim().length >= 3) return true;
@@ -426,11 +421,13 @@ export default function ModernUI({ plants, handleLogout, isNative }) {
                     style={{ height: '100%', minHeight: '400px' }}
                     data={filteredPlants}
                     components={{
-                      List: forwardRef(({ style, children, ...props }, ref) => (
-                        <div ref={ref} {...props} style={style} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
-                          {children}
-                        </div>
-                      ))
+                      List: forwardRef(function GridList({ style, children, ...props }, ref) {
+                        return (
+                          <div ref={ref} {...props} style={style} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-4">
+                            {children}
+                          </div>
+                        );
+                      })
                     }}
                     itemContent={(i, plant) => (
                       <div 
